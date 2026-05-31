@@ -20,10 +20,11 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// changes on a resolution swap.
 /// <para>
 /// Threading: every PropertyChanged path that triggers <see cref="Render"/> originates on
-/// the UI thread (Transport commands, Settings edits via the inspector), so the call into
-/// <c>SkiaCompositor</c> stays on the UI thread — required both for the <c>GraphicsClip</c>
-/// render path that bounces through <c>RenderTargetBitmap</c> and for the unfrozen reusable
-/// bitmap, which can't cross threads. Off-UI playback is #11's problem.
+/// the UI thread (Transport commands incl. the playback engine's clock tick, Settings edits
+/// via the inspector), so the call into <c>SkiaCompositor</c> stays on the UI thread —
+/// required both for the <c>GraphicsClip</c> render path that bounces through
+/// <c>RenderTargetBitmap</c> and for the unfrozen reusable bitmap, which can't cross threads.
+/// Off-thread decode-ahead is deferred phase 2 (ADR 0005).
 /// </para>
 /// </summary>
 public partial class PreviewViewModel : ObservableObject

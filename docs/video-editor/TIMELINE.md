@@ -54,7 +54,7 @@ TimelineView (UserControl)                          Controls/TimelineView.xaml
       │         └─ ItemsControl  ItemsSource=Project.Tracks
       │            └─ TrackHeaderView (× one per Track, 120×56)
       │                  Controls/Timeline/TrackHeaderView.xaml
-      │                  • Track name + [M]ute / [L]ock / [D]isable stub toggles
+      │                  • Track name + [M]ute / [L]ock / [D]isable toggles (bound to Track.Muted/Locked/Disabled)
       │                  • Collapsed via DataTrigger when Clips.Count == 0
       │
       └─ (1,1)  ScrollViewer "MainScroller"

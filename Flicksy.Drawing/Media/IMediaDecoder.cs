@@ -42,8 +42,8 @@ public interface IMediaDecoder : IDisposable
     /// <paramref name="time"/> as interleaved float32 at the decoder's configured target
     /// sample rate. Zero-fills any region beyond <see cref="Duration"/> or when
     /// <see cref="HasAudio"/> is false. Channel layouts other than stereo are downmixed
-    /// (mono duplicated to both channels; multi-channel front-left/front-right summed
-    /// and divided by the front channel count).
+    /// (mono duplicated to both channels; more than two channels take the
+    /// front-left/front-right pair, channels 0 and 1).
     /// </summary>
     void GetAudioSamplesAt(TimeSpan time, Span<float> destination);
 }

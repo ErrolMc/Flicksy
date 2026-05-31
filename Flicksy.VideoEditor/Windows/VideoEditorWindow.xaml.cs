@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
 using Flicksy.VideoEditor.ViewModels;
 
@@ -89,6 +90,21 @@ public partial class VideoEditorWindow : Window
     {
         base.OnClosed(e);
         ViewModel.Dispose();
+    }
+
+    // Spacebar toggles play/pause at the window level (standard NLE shortcut). Ignored while a
+    // text box has focus — the project-name box and inline clip/bin rename need the space key
+    // for typing. Handled here (PreviewKeyDown) so it overrides Space-activates-button on the
+    // transport buttons; IsRepeat is filtered so holding space doesn't flutter play/pause.
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        if (e.Key != Key.Space || e.IsRepeat) return;
+        if (Keyboard.FocusedElement is TextBoxBase) return;
+
+        ViewModel.Transport.PlayPauseCommand.Execute(null);
+        e.Handled = true;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

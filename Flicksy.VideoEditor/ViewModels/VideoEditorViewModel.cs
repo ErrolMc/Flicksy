@@ -4,6 +4,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Flicksy.VideoEditor.Composition;
+using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
 
 namespace Flicksy.VideoEditor.ViewModels;
@@ -19,6 +20,7 @@ namespace Flicksy.VideoEditor.ViewModels;
 public partial class VideoEditorViewModel : ObservableObject, IDisposable
 {
     private readonly ICompositor _compositor;
+    private readonly PlaybackEngine _playbackEngine;
     private bool _disposed;
 
     [ObservableProperty]
@@ -51,6 +53,12 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         Timeline = new TimelineViewModel(project, Transport);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
+
+        // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
+        // Transport (which Preview, Timeline and the ruler already observe). Attach after both
+        // exist — the engine needs Transport, and Transport's commands delegate to the engine.
+        _playbackEngine = new PlaybackEngine(project, Transport);
+        Transport.AttachPlaybackController(_playbackEngine);
 
         // Timeline.SelectedClip is the user-facing write side (clip clicks); root's
         // SelectedClip is what every other surface reads (right rail, inspectors).
@@ -130,6 +138,9 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        // Engine first: stops the clock + audio output and unhooks Rendering before the
+        // compositor's decoder cache (which the preview's last render may still touch) goes.
+        _playbackEngine.Dispose();
         _compositor.Dispose();
     }
 }

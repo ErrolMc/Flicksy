@@ -1,7 +1,7 @@
 namespace Flicksy.VideoEditor.Composition;
 
 /// <summary>
-/// Output of <c>ICompositor.RenderAudio</c>: one video-frame's worth of mixed audio at
+/// Output of <c>IAudioMixer.RenderAudio</c>: one video-frame's worth of mixed audio at
 /// the project's sample rate. Layout is interleaved stereo float32:
 /// <c>[L0, R0, L1, R1, …]</c>. <see cref="FrameCount"/> stereo frames =
 /// <c>SampleRate / Framerate</c> per call.

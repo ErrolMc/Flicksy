@@ -16,7 +16,8 @@ namespace Flicksy.VideoEditor.Composition;
 /// <see cref="WriteableBitmap"/>'s back buffer via <see cref="SKBitmap.InstallPixels(SKImageInfo, IntPtr, int)"/>
 /// so paints land directly in WPF-bindable memory — no intermediate Skia surface, no
 /// extra copy. <see cref="CompositionPlanner.PlanFrame"/> supplies the layer list; this
-/// class only owns paint dispatch, the decoder cache, and the audio mix.
+/// class only owns paint dispatch and the (video) decoder cache. Audio mixing moved to
+/// <see cref="AudioMixer"/> per ADR 0005.
 /// <para>
 /// Threading: per <see cref="ICompositor"/>, calls are single-call-in-flight on one
 /// thread at a time; the class is not thread-safe across concurrent callers.
@@ -25,12 +26,12 @@ namespace Flicksy.VideoEditor.Composition;
 /// must share a thread — the UI thread today. Two independent constraints already point
 /// the same way: the <see cref="GraphicsClip"/> path needs a Dispatcher for
 /// <see cref="RenderTargetBitmap"/>, and an unfrozen bitmap can't cross threads.
-/// Off-UI decode-ahead playback is #11's job.
+/// Off-UI decode-ahead playback is #11's deferred phase 2.
 /// </para>
 /// </summary>
 public sealed class SkiaCompositor : ICompositor
 {
-    private readonly Dictionary<Guid, IMediaDecoder> _decoders = new();
+    private readonly MediaDecoderCache _decoders = new();
     private bool _disposed;
 
     public void RenderFrame(Project.Project project, int frame, WriteableBitmap target)
@@ -83,53 +84,11 @@ public sealed class SkiaCompositor : ICompositor
         }
     }
 
-    public AudioBuffer RenderAudio(Project.Project project, int frame)
-    {
-        ArgumentNullException.ThrowIfNull(project);
-        if (_disposed) throw new ObjectDisposedException(nameof(SkiaCompositor));
-
-        int sampleRate = project.Settings.AudioSampleRate;
-        int framerate = project.Settings.Framerate;
-        int stereoFrames = framerate > 0 ? sampleRate / framerate : 0;
-        var output = new float[stereoFrames * 2];
-
-        if (stereoFrames == 0) return new AudioBuffer(output, sampleRate);
-
-        var layers = CompositionPlanner.PlanFrame(project, frame);
-        // Scratch buffer reused across all audio-eligible layers — each clip's samples
-        // get scaled by Volume and accumulated into `output`.
-        var scratch = new float[stereoFrames * 2];
-
-        foreach (var layer in layers)
-        {
-            if (!IsAudibleLayer(layer)) continue;
-            var mediaClip = (MediaClip)layer.Clip;
-
-            var decoder = TryGetOrCreateDecoder(mediaClip, sampleRate);
-            if (decoder is null || !decoder.HasAudio) continue;
-
-            decoder.GetAudioSamplesAt(layer.SourceTime, scratch);
-
-            float volume = (float)mediaClip.Volume;
-            for (int i = 0; i < scratch.Length; i++)
-            {
-                output[i] += scratch[i] * volume;
-            }
-        }
-
-        return new AudioBuffer(output, sampleRate);
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-
-        foreach (var decoder in _decoders.Values)
-        {
-            try { decoder.Dispose(); } catch { /* swallow — best-effort cleanup */ }
-        }
-        _decoders.Clear();
+        _decoders.Dispose();
     }
 
     // ---- Paint dispatch -----------------------------------------------------
@@ -152,7 +111,7 @@ public sealed class SkiaCompositor : ICompositor
     {
         if (clip.IsBroken) return;
 
-        var decoder = TryGetOrCreateDecoder(clip, sampleRate);
+        var decoder = _decoders.GetOrCreate(clip, sampleRate);
         if (decoder is null || !decoder.HasVideo) return;
 
         var maybeFrame = decoder.GetVideoFrameAt(layer.SourceTime);
@@ -241,30 +200,6 @@ public sealed class SkiaCompositor : ICompositor
         }
     }
 
-    // ---- Decoder cache ------------------------------------------------------
-
-    private IMediaDecoder? TryGetOrCreateDecoder(MediaClip clip, int sampleRate)
-    {
-        if (_decoders.TryGetValue(clip.Id, out var existing)) return existing;
-
-        var path = clip.Source?.SourcePath;
-        if (string.IsNullOrEmpty(path)) return null;
-
-        try
-        {
-            var decoder = new FFmpegMediaDecoder(path, sampleRate);
-            _decoders[clip.Id] = decoder;
-            return decoder;
-        }
-        catch
-        {
-            // Probe failure — render nothing for this clip. Logging hook lands with the
-            // diagnostics work; silent for now matches the rest of the pipeline (broken
-            // clip already reds-out in the timeline).
-            return null;
-        }
-    }
-
     // ---- Matrix + helpers ---------------------------------------------------
 
     /// <summary>
@@ -312,15 +247,5 @@ public sealed class SkiaCompositor : ICompositor
         m = SKMatrix.Concat(SKMatrix.CreateTranslation(clipCenterX, clipCenterY), m);
 
         return (m, srcClip);
-    }
-
-    private static bool IsAudibleLayer(CompositionLayer layer)
-    {
-        if (layer.Track.Kind == TrackKind.Overlay) return false;
-        if (layer.Track.Muted) return false;
-        if (layer.Clip is not MediaClip mediaClip) return false;
-        if (mediaClip.Streams != ClipStreams.Audio && mediaClip.Streams != ClipStreams.Both) return false;
-        if (mediaClip.IsBroken) return false;
-        return true;
     }
 }

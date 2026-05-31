@@ -12,22 +12,23 @@ namespace Flicksy.Drawing.Media;
 /// (clip, source) pair — see <see cref="IMediaDecoder"/> for cache-key rationale.
 /// <para>
 /// Video reads are synchronous seek-and-grab via <c>MediaFile.Video.GetFrame</c>, the same
-/// path <see cref="FFmpegVideoPlayer"/> uses for inline-on-seek presentation. A
-/// <see cref="Lock"/> serializes access because the compositor may invoke multiple
-/// decoders concurrently and FFMediaToolkit's <c>MediaFile</c> is not thread-safe.
+/// path <see cref="FFmpegVideoPlayer"/> uses for inline-on-seek presentation.
+/// FFMediaToolkit's <c>GetFrame</c> reads forward without a costly seek when the requested
+/// frame is the next one (or the same one), so sequential playback stays cheap; only a jump
+/// triggers a real seek. A <see cref="Lock"/> serializes access because the compositor may
+/// invoke multiple decoders concurrently and FFMediaToolkit's <c>MediaFile</c> is not
+/// thread-safe.
 /// </para>
 /// <para>
-/// Audio decode is stubbed for this scaffolding slice: <see cref="GetAudioSamplesAt"/>
-/// zero-fills the destination buffer. Real decode + resample/remix lands when the
-/// compositor's audio mix pass (step 6 / issue #10) wires up <c>RenderAudio</c>; the
-/// interface contract and metadata plumbing are in place so the compositor can be built
-/// against this primitive immediately.
+/// Audio decode (per ADR 0005) lives in the <c>FFmpegMediaDecoder.Audio.cs</c> partial: a
+/// read cursor reads source frames forward during playback and seeks only on a discontinuity,
+/// with leftover samples + linear-resampler state persisted across calls for click-free
+/// output, plus N-channel→stereo remix and rate conversion.
 /// </para>
 /// </summary>
-public sealed class FFmpegMediaDecoder : IMediaDecoder
+public sealed partial class FFmpegMediaDecoder : IMediaDecoder
 {
     private readonly Lock _gate = new();
-    private readonly int _targetSampleRate;
 
     private MediaFile? _file;
     private bool _disposed;
@@ -37,11 +38,6 @@ public sealed class FFmpegMediaDecoder : IMediaDecoder
     public TimeSpan Duration { get; private set; }
     public int VideoWidth { get; private set; }
     public int VideoHeight { get; private set; }
-
-    /// <summary>Source-side sample rate, read from the file header. Kept for the audio resampler.</summary>
-    private int _sourceSampleRate;
-    /// <summary>Source-side channel count, read from the file header. Kept for the audio remixer.</summary>
-    private int _sourceChannelCount;
 
     public FFmpegMediaDecoder(string path, int targetSampleRate)
     {
@@ -70,10 +66,9 @@ public sealed class FFmpegMediaDecoder : IMediaDecoder
         }
         if (_file.HasAudio)
         {
-            var info = _file.Audio.Info;
-            _sourceSampleRate = info.SampleRate;
-            _sourceChannelCount = info.NumChannels;
-            if (info.Duration > duration) duration = info.Duration;
+            // Audio-stream setup (source rate + resampler ratio) lives in the audio partial.
+            var audioDuration = InitAudioStream();
+            if (audioDuration > duration) duration = audioDuration;
         }
         Duration = duration;
     }
@@ -108,26 +103,6 @@ public sealed class FFmpegMediaDecoder : IMediaDecoder
                 return null;
             }
         }
-    }
-
-    public void GetAudioSamplesAt(TimeSpan time, Span<float> destination)
-    {
-        // Always start zeroed — every short-circuit path below leaves silence in place.
-        destination.Clear();
-
-        if (destination.Length == 0) return;
-        if (_disposed || !HasAudio) return;
-        if (time >= Duration) return;
-
-        // TODO(#10 step 6): decode source packets via _file.Audio.GetFrame(time), then
-        // remix N-channel → stereo and resample from _sourceSampleRate → _targetSampleRate,
-        // writing into `destination` as interleaved [L0, R0, L1, R1, ...]. Stubbed silent
-        // for the scaffolding slice; the interface contract + source metadata is captured
-        // so the compositor's RenderAudio path can be built against this primitive and the
-        // real decode wired in when the audio mix pass lands.
-        _ = _sourceSampleRate;
-        _ = _sourceChannelCount;
-        _ = _targetSampleRate;
     }
 
     public void Dispose()

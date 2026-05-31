@@ -4,10 +4,9 @@ namespace Flicksy.VideoEditor.Controls;
 
 /// <summary>
 /// Center-column transport bar: prev/play-pause/next buttons flanked by current and total
-/// timecode labels. All commands resolve from <see cref="ViewModels.VideoEditorViewModel"/>
-/// and are no-op stubs in this slice — play/pause flips <c>IsPlaying</c> for visual
-/// feedback, prev/next step <c>Playhead</c> by one frame. Real playback wiring lands in
-/// #11.
+/// timecode labels. Commands bind to <see cref="ViewModels.TransportViewModel"/>, which
+/// delegates them to the playback engine (clock-driven play/pause and frame stepping); the
+/// engine writes <c>Playhead</c> / <c>IsPlaying</c> back for the labels to reflect.
 /// </summary>
 public partial class TransportView : UserControl
 {

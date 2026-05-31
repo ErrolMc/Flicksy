@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
 
 namespace Flicksy.VideoEditor.ViewModels;
@@ -14,13 +15,19 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// <see cref="TotalFrames"/> at the project framerate. <see cref="TotalFrames"/> tracks
 /// the project's clip set live (re-derived when tracks or clips mutate) so the ruler,
 /// lane content width, and seek clamp all stay in step with bin-to-timeline drops and
-/// Split-audio track additions. Real playback wiring (the compositor driving frame
-/// presentation) lands in #11.
+/// Split-audio track additions.
+/// <para>
+/// Play/pause and frame-step delegate to the attached <see cref="IPlaybackController"/>
+/// (the <see cref="Playback.PlaybackEngine"/>), which owns the clock and writes
+/// <see cref="Playhead"/> / <see cref="IsPlaying"/> back here. When no controller is attached
+/// (e.g. unit tests) the commands fall back to manipulating the playhead directly.
+/// </para>
 /// </summary>
 public partial class TransportViewModel : ObservableObject
 {
     private readonly Project.Project _project;
     private readonly int _framerate;
+    private IPlaybackController? _playback;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentTimecode))]
@@ -54,21 +61,43 @@ public partial class TransportViewModel : ObservableObject
 
     public string PlayPauseLabel => IsPlaying ? "Pause" : "Play";
 
+    /// <summary>
+    /// Wire the transport's commands to the playback engine. Called once by
+    /// <see cref="VideoEditorViewModel"/> after both are constructed (the engine needs this VM,
+    /// and this VM delegates back to the engine — a two-step attach breaks the cycle).
+    /// </summary>
+    public void AttachPlaybackController(IPlaybackController controller) => _playback = controller;
+
     [RelayCommand]
     private void PlayPause()
     {
+        if (_playback is not null)
+        {
+            _playback.TogglePlayPause();
+            return;
+        }
         IsPlaying = !IsPlaying;
     }
 
     [RelayCommand]
     private void PrevFrame()
     {
+        if (_playback is not null)
+        {
+            _playback.StepFrame(-1);
+            return;
+        }
         Playhead = Math.Max(0, Playhead - 1);
     }
 
     [RelayCommand]
     private void NextFrame()
     {
+        if (_playback is not null)
+        {
+            _playback.StepFrame(1);
+            return;
+        }
         Playhead = TotalFrames > 0
             ? Math.Min(TotalFrames, Playhead + 1)
             : Playhead + 1;
