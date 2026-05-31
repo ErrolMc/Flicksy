@@ -34,7 +34,7 @@ An ordered horizontal lane on the timeline that contains `Clip`s. Has a `TrackKi
 _Avoid_: "layer", "row", "channel".
 
 **Muted (track flag)**:
-Audio-only mute. An `Audio` track with `Muted=true` contributes zero samples to the audio mix. Video output is unaffected. The M button is shown only on Audio track headers (hidden on Video/Overlay) because Video-track audio control is done by splitting the clip first. To silence a `Streams=Both` clip's audio, use the per-clip **Split audio** command to produce an Audio track, then mute that.
+Audio-only mute. An `Audio` track with `Muted=true` contributes zero samples to the audio mix. Video output is unaffected. The M button is shown only on Audio track headers (hidden on Video/Overlay) because Video-track audio control is done by splitting the clip first. To silence a `Streams=Both` clip's audio, use the per-clip **Detach audio** command to produce an Audio track, then mute that.
 _Avoid_: applying "mute" to video (use `Disabled` for video skip).
 
 **Locked (track flag)**:
@@ -50,7 +50,7 @@ The unit of content on a `Track`, occupying a half-open interval `[TimelineStart
 _Avoid_: "segment", "block", "item" (collides with `DrawingItem`).
 
 **MediaClip**:
-A `Clip` that references a `MediaSource` by id. Holds `MediaSourceId`, `SourceIn`, `SourceOut` (in source time), `TimelineStart`, `Speed`, `Streams` (`Video` / `Audio` / `Both`, default `Both`), per-clip `Transform` (position/scale/rotate/crop), `FilterChain`, `Volume`. Timeline duration is `(SourceOut - SourceIn) / Speed`. The underlying file path lives on the `MediaSource`, not the clip — many clips can share one source. `Streams` controls what the compositor renders: dropping a video+audio source on a Video track creates `Streams=Both`; the per-clip **Split audio** command flips a `Streams=Both` clip to `Streams=Video` and adds a paired `Streams=Audio` clip on a freshly-created Audio track named `"<source video track> (Audio)"` (with `" N"` de-collision suffix if the name is already in use). Each split creates its own new track. Video tracks accept `Streams ∈ {Both, Video}` in any mix; Audio tracks accept `Streams=Audio` only.
+A `Clip` that references a `MediaSource` by id. Holds `MediaSourceId`, `SourceIn`, `SourceOut` (in source time), `TimelineStart`, `Speed`, `Streams` (`Video` / `Audio` / `Both`, default `Both`), per-clip `Transform` (position/scale/rotate/crop), `FilterChain`, `Volume`. Timeline duration is `(SourceOut - SourceIn) / Speed`. The underlying file path lives on the `MediaSource`, not the clip — many clips can share one source. `Streams` controls what the compositor renders: dropping a video+audio source on a Video track creates `Streams=Both`; the per-clip **Detach audio** command flips a `Streams=Both` clip to `Streams=Video` and adds a paired `Streams=Audio` clip on a freshly-created Audio track named `"<source video track> (Audio)"` (with `" N"` de-collision suffix if the name is already in use). Each detach creates its own new track. Video tracks accept `Streams ∈ {Both, Video}` in any mix; Audio tracks accept `Streams=Audio` only.
 _Avoid_: "video clip" (it can be audio-only), "source clip".
 
 **MediaSource**:
@@ -72,6 +72,24 @@ _Avoid_: using bare "time" when which one matters.
 **Frame**:
 The canonical unit of `TimelineTime`. All clip positions and durations are integer frame counts at the project's `Framerate`. Sub-frame audio offsets use samples, not fractional frames.
 _Avoid_: "second" or `double`-seconds as a storage unit.
+
+### Timeline editing operations
+
+**Split**:
+Cutting one `Clip` into two adjacent clips at the playhead's `TimelineTime`. For a `MediaClip` the source range divides at the mapped `SourceTime`; the two halves inherit the original's other properties.
+_Avoid_: "cut", "slice", "razor" (the razor is the gesture; the operation is a Split).
+
+**Trim**:
+Dragging a `Clip`'s left or right edge to change its in/out point and `Duration` — for a `MediaClip`, adjusting `SourceIn` (left edge) or `SourceOut` (right edge).
+_Avoid_: "resize", "crop" (crop is the snip editor's image operation).
+
+**Move**:
+Dragging a `Clip` to a new `TimelineStart`, optionally onto another `Track` of the same `TrackKind`.
+_Avoid_: "reposition", bare "drag" (that's the gesture, not the result).
+
+**Detach audio**:
+The per-`MediaClip` operation that moves a `Streams=Both` clip's audio onto a new `Audio` track, leaving the original as `Streams=Video`; the two clips are unlinked afterward.
+_Avoid_: "Split audio" (collides with **Split**), "extract audio", "unlink".
 
 ### Video editor rendering
 
