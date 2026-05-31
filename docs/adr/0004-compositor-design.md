@@ -1,5 +1,7 @@
 # Compositor design
 
+> **Amended by [ADR 0005](0005-playback-threading-and-audio.md):** #11 moves `RenderAudio` out of `ICompositor` into a separate `IAudioMixer`, and resolves the playback threading model this ADR defers to #11 (v1 is UI-thread; off-thread decode-ahead is phase 2). The decisions below stand except where 0005 supersedes them.
+
 ## Decision
 
 The video editor's compositor is a stateful object that produces a composited frame and an audio buffer for a given `(Project, frame)` input. Its responsibilities, dependencies, and boundaries are:
@@ -13,6 +15,8 @@ public interface ICompositor : IDisposable
     AudioBuffer RenderAudio(Project project, int frame);
 }
 ```
+
+_Amended by ADR 0005: `RenderAudio` has moved to a separate `IAudioMixer`; `ICompositor` retains only `RenderFrame`._
 
 `RenderFrame` paints into a caller-owned `WriteableBitmap` sized to `ProjectSettings.{ResolutionWidth, ResolutionHeight}`; the caller reuses one bitmap across frames so the compositor allocates no per-frame surface. The bitmap is left unfrozen (it's reused), so the compositor and the consumer that presents it share one thread (the UI thread today). `AudioBuffer.Samples` is `float[]` interleaved stereo at `ProjectSettings.AudioSampleRate`, one video frame's worth of samples per call (`SampleRate / Framerate` samples per channel).
 

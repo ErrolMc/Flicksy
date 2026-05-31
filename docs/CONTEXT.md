@@ -75,9 +75,17 @@ _Avoid_: "second" or `double`-seconds as a storage unit.
 
 ### Video editor rendering
 
+**PlaybackEngine**:
+The video editor's playback driver. Owns the playback clock and, while playing, advances `TimelineTime` at the project `Framerate`, driving the `Compositor` to present each frame and the `AudioMixer` to feed the audio output device. The video-editor counterpart to `IVideoPlayer`'s clock role, but driving the multi-clip `Compositor` / `AudioMixer` instead of a single source. The Transport bar's play/pause/seek/step delegate to it; it writes the playhead position back for the UI to observe.
+_Avoid_: "player" (reserved for `IVideoPlayer`'s push shape), "transport" (the UI bar and its view-model, not the engine).
+
 **Compositor**:
-The render engine that produces a composited frame and an audio mix at a given `TimelineTime`, gathering inputs from all `Track`s. Pure-ish input/output: `(Project, frame) → (frame image, audio buffer)`. Owns an internal decoder cache keyed by `Clip.Id`. Implementation choice (`SkiaCompositor` today, `Direct2DCompositor`/`Dx11Compositor` in the future) is encapsulated behind an `ICompositor` seam. See [ADR 0004](adr/0004-compositor-design.md).
-_Avoid_: "renderer" (overloaded with `DrawingItem.Render`), "mixer" (the audio half only).
+The video render engine that produces a composited frame at a given `TimelineTime`, gathering inputs from all `Track`s. Pure-ish input/output: `(Project, frame) → frame image`. Owns an internal video-decoder cache keyed by `Clip.Id`. Implementation choice (`SkiaCompositor` today, `Direct2DCompositor`/`Dx11Compositor` in the future) is encapsulated behind an `ICompositor` seam. The audio half is the separate `AudioMixer`. See [ADR 0004](adr/0004-compositor-design.md).
+_Avoid_: "renderer" (overloaded with `DrawingItem.Render`), "mixer" (that's the `AudioMixer`).
+
+**AudioMixer**:
+The audio counterpart to the `Compositor`: produces the audio mix for a given `TimelineTime` by summing each audible clip's samples scaled by `Volume`. Pure-ish input/output: `(Project, frame) → audio buffer`. Owns its own audio-decoder cache, separate from the `Compositor`'s video cache, so a `Streams=Both` clip's audio and video advance on independent decoder cursors. Lives behind an `IAudioMixer` seam; driven by the `PlaybackEngine` on the audio output thread.
+_Avoid_: folding it back into "compositor" (the compositor is video-only).
 
 **CompositionLayer**:
 The unit of work a `Compositor` consumes per frame — one entry per visible `Clip` at `TimelineTime` T, carrying its z-order, source-time mapping (speed-aware), and `Transform2D`. Produced by `CompositionPlanner`. Backend-agnostic; every `ICompositor` implementation walks the same layer list and only the paint step varies.
