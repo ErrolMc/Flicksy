@@ -48,11 +48,10 @@ public partial class MediaClip : Clip
     private ClipStreams streams = ClipStreams.Both;
 
     // Per-clip name override. Empty by default — DisplayName falls through to the
-    // source's display name so bin renames flow to the clip label. Set by operations
-    // that want the clip's identity to diverge from the source (today: SplitAudio
-    // stores "<source> (Audio)" so the split-off clip keeps its name even if the
-    // user later renames the source in the bin). Also set by user rename through
-    // the ClipView context menu.
+    // source's display name so bin renames flow to the clip label. Set by user rename
+    // through the ClipView context menu. (The Detach audio command leaves this empty and
+    // lets DisplayName auto-derive "<source> (Audio)" so the label still tracks bin
+    // renames of the source.)
     [ObservableProperty]
     private string name = string.Empty;
 

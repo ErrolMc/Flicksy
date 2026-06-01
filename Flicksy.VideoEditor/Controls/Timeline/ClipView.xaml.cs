@@ -73,7 +73,7 @@ public partial class ClipView : UserControl
     // Right-click selects the clip too, but does NOT mark the event handled so WPF's
     // default ContextMenu pop still fires. Without this the user could open the menu on
     // a non-selected clip, which makes the "selected clip is the operand" mental model
-    // inconsistent with Split audio actually running on the clicked clip.
+    // inconsistent with Detach audio actually running on the clicked clip.
     private void OnClipRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is not Clip clip) return;
@@ -85,12 +85,12 @@ public partial class ClipView : UserControl
     private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         // Visible-but-disabled gating. Rename is enabled for any MediaClip (rename target
-        // is the per-clip Name override on MediaClip). Split audio additionally requires
+        // is the per-clip Name override on MediaClip). Detach audio additionally requires
         // Streams=Both — the spec wants users to discover both items even when they don't
         // apply to the current clip subtype.
         var isMediaClip = DataContext is MediaClip;
         RenameMenuItem.IsEnabled = isMediaClip;
-        SplitAudioMenuItem.IsEnabled = DataContext is MediaClip { Streams: ClipStreams.Both };
+        DetachAudioMenuItem.IsEnabled = DataContext is MediaClip { Streams: ClipStreams.Both };
     }
 
     private void OnRenameClick(object sender, RoutedEventArgs e)
@@ -101,11 +101,11 @@ public partial class ClipView : UserControl
         }
     }
 
-    private void OnSplitAudioClick(object sender, RoutedEventArgs e)
+    private void OnDetachAudioClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MediaClip clip) return;
         var timeline = FindTimelineViewModel();
-        timeline?.SplitAudio(clip);
+        timeline?.DetachAudio(clip);
     }
 
     // The inline rename TextBox lives inside the MediaClip DataTemplate; these three

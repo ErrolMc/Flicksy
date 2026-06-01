@@ -15,7 +15,7 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// <see cref="TotalFrames"/> at the project framerate. <see cref="TotalFrames"/> tracks
 /// the project's clip set live (re-derived when tracks or clips mutate) so the ruler,
 /// lane content width, and seek clamp all stay in step with bin-to-timeline drops and
-/// Split-audio track additions.
+/// Detach-audio track additions.
 /// <para>
 /// Play/pause and frame-step delegate to the attached <see cref="IPlaybackController"/>
 /// (the <see cref="Playback.PlaybackEngine"/>), which owns the clock and writes
