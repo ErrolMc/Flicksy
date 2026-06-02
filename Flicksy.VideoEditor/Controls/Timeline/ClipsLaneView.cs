@@ -19,8 +19,10 @@ namespace Flicksy.VideoEditor.Controls.Timeline;
 /// no visual-tree walking. The lane subscribes to:
 ///  - <c>Track.Clips.CollectionChanged</c> — add/remove rebuilds children.
 ///  - Each <c>Clip.PropertyChanged</c> — <c>TimelineStart</c>/<c>Duration</c> re-layout.
-///  - <c>Timeline.PropertyChanged</c> — <c>PixelsPerFrame</c> re-layouts all,
-///    <c>SelectedClip</c> updates <see cref="ClipView.IsSelected"/> on the matching child.
+///  - <c>Timeline.PropertyChanged</c> — <c>PixelsPerFrame</c> re-layouts all clips.
+///  - <c>Timeline.SelectedClips.CollectionChanged</c> — re-applies
+///    <see cref="ClipView.IsSelected"/> across the lane so every clip in the multi-selection
+///    set is highlighted, not just the primary <see cref="TimelineViewModel.SelectedClip"/>.
 /// </summary>
 public sealed class ClipsLaneView : Canvas
 {
@@ -50,6 +52,7 @@ public sealed class ClipsLaneView : Canvas
     private readonly PropertyChangedEventHandler _timelineHandler;
     private readonly PropertyChangedEventHandler _transportHandler;
     private readonly NotifyCollectionChangedEventHandler _clipsChangedHandler;
+    private readonly NotifyCollectionChangedEventHandler _selectedClipsChangedHandler;
     private TransportViewModel? _subscribedTransport;
     private GhostClipAdorner? _ghostAdorner;
 
@@ -63,6 +66,7 @@ public sealed class ClipsLaneView : Canvas
         _timelineHandler = OnTimelinePropertyChanged;
         _transportHandler = OnTransportPropertyChanged;
         _clipsChangedHandler = OnClipsCollectionChanged;
+        _selectedClipsChangedHandler = OnSelectedClipsCollectionChanged;
 
         AllowDrop = true;
         DragEnter += OnDragEnter;
@@ -118,6 +122,7 @@ public sealed class ClipsLaneView : Canvas
         if (oldVm is not null)
         {
             oldVm.PropertyChanged -= _timelineHandler;
+            oldVm.SelectedClips.CollectionChanged -= _selectedClipsChangedHandler;
         }
         if (_subscribedTransport is not null)
         {
@@ -126,6 +131,7 @@ public sealed class ClipsLaneView : Canvas
         if (newVm is not null)
         {
             newVm.PropertyChanged += _timelineHandler;
+            newVm.SelectedClips.CollectionChanged += _selectedClipsChangedHandler;
         }
         _subscribedTransport = newVm?.Transport;
         if (_subscribedTransport is not null)
@@ -139,16 +145,20 @@ public sealed class ClipsLaneView : Canvas
 
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        switch (e.PropertyName)
+        if (e.PropertyName == nameof(TimelineViewModel.PixelsPerFrame))
         {
-            case nameof(TimelineViewModel.PixelsPerFrame):
-                UpdateAllLayouts();
-                InvalidateMeasure();
-                break;
-            case nameof(TimelineViewModel.SelectedClip):
-                UpdateAllSelections();
-                break;
+            UpdateAllLayouts();
+            InvalidateMeasure();
         }
+    }
+
+    // Selection highlight tracks the whole SelectedClips set (not just the primary
+    // SelectedClip) so Ctrl-click / marquee multi-selection shows a border on every member.
+    // Every selection change mutates SelectedClips (TimelineViewModel invariant), so this one
+    // subscription covers single-select, Ctrl-click toggle, and clear alike.
+    private void OnSelectedClipsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        UpdateAllSelections();
     }
 
     private void OnTransportPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -230,10 +240,13 @@ public sealed class ClipsLaneView : Canvas
 
     private void UpdateAllSelections()
     {
-        var selected = Timeline?.SelectedClip;
+        // Clip is a plain reference type (no overridden Equals), so Contains is reference
+        // identity — same semantics as the old ReferenceEquals(SelectedClip) check, extended
+        // to the full multi-selection set.
+        var selection = Timeline?.SelectedClips;
         foreach (var (clip, view) in _clipViews)
         {
-            view.IsSelected = ReferenceEquals(clip, selected);
+            view.IsSelected = selection is not null && selection.Contains(clip);
         }
     }
 

@@ -15,8 +15,8 @@
         WindowStartupLocation="CenterScreen"
         Background="#121212">
     <Window.InputBindings>
-        <KeyBinding Modifiers="Control" Key="Z" Command="{Binding UndoCommand}" />
-        <KeyBinding Modifiers="Control" Key="Y" Command="{Binding RedoCommand}" />
+        <KeyBinding Modifiers="Control" Key="Z" Command="{Binding History.UndoCommand}" />
+        <KeyBinding Modifiers="Control" Key="Y" Command="{Binding History.RedoCommand}" />
     </Window.InputBindings>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -114,10 +114,10 @@
                     <Button Style="{StaticResource ToolbarButtonStyle}"
                             Content="Undo"
                             Margin="0,0,8,0"
-                            Command="{Binding UndoCommand}" />
+                            Command="{Binding History.UndoCommand}" />
                     <Button Style="{StaticResource ToolbarButtonStyle}"
                             Content="Redo"
-                            Command="{Binding RedoCommand}" />
+                            Command="{Binding History.RedoCommand}" />
                 </StackPanel>
 
                 <Button Grid.Column="2"

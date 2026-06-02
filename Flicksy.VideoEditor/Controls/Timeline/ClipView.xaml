@@ -87,7 +87,6 @@
             BorderThickness="1"
             CornerRadius="2"
             ClipToBounds="True"
-            MouseLeftButtonDown="OnClipMouseDown"
             PreviewMouseRightButtonDown="OnClipRightButtonDown"
             ContextMenuOpening="OnContextMenuOpening">
         <Border.ContextMenu>

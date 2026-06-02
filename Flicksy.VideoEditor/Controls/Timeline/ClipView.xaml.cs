@@ -15,9 +15,15 @@ namespace Flicksy.VideoEditor.Controls.Timeline;
 ///
 /// <see cref="IsSelected"/> is pushed down by the parent <see cref="ClipsLaneView"/> when
 /// the host's <see cref="TimelineViewModel.SelectedClip"/> changes; the border color
-/// reflects it. Click bubbles up via <see cref="VisualTreeHelper"/> walk to find the host
-/// <see cref="TimelineViewModel"/> and writes <see cref="TimelineViewModel.SelectedClip"/>
-/// directly (the root VM mirrors back to its own SelectedClip).
+/// reflects it.
+/// <para>
+/// Left-click selection migrated to the interaction layer (ADR 0007): the timeline-wide
+/// <c>MoveTool</c> / <c>MarqueeTool</c> on <c>TimelineView</c>'s Preview handlers own
+/// click-select and click-deselect. This control keeps its non-gesture concerns only — the
+/// context menu (Rename / Detach audio) and inline rename. Right-click still selects the clip
+/// here so the menu operates on the clicked clip (the left-button Preview path doesn't cover
+/// right-clicks).
+/// </para>
 /// </summary>
 public partial class ClipView : UserControl
 {
@@ -59,21 +65,12 @@ public partial class ClipView : UserControl
         OuterBorder.BorderThickness = new Thickness(IsSelected ? 2 : 1);
     }
 
-    private void OnClipMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (DataContext is not Clip clip) return;
-
-        var timeline = FindTimelineViewModel();
-        if (timeline is null) return;
-
-        timeline.SelectedClip = clip;
-        e.Handled = true;
-    }
-
-    // Right-click selects the clip too, but does NOT mark the event handled so WPF's
-    // default ContextMenu pop still fires. Without this the user could open the menu on
-    // a non-selected clip, which makes the "selected clip is the operand" mental model
-    // inconsistent with Detach audio actually running on the clicked clip.
+    // Right-click selects the clip, but does NOT mark the event handled so WPF's default
+    // ContextMenu pop still fires. Without this the user could open the menu on a
+    // non-selected clip, which makes the "selected clip is the operand" mental model
+    // inconsistent with Detach audio actually running on the clicked clip. Left-click
+    // selection lives in the interaction layer (MoveTool); right-click stays here because
+    // the left-button Preview path on TimelineView doesn't see right-clicks.
     private void OnClipRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is not Clip clip) return;

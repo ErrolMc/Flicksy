@@ -21,8 +21,7 @@
          timeline, regardless of which sub-scroller the cursor is over. -->
     <Border x:Name="RootBorder"
             Background="#161616"
-            PreviewMouseWheel="OnRootPreviewMouseWheel"
-            PreviewMouseLeftButtonDown="OnRootPreviewMouseLeftButtonDown">
+            PreviewMouseWheel="OnRootPreviewMouseWheel">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="120" />
@@ -79,7 +78,19 @@
                           VerticalScrollBarVisibility="Auto"
                           ScrollChanged="OnMainScrollerScrollChanged"
                           Focusable="False">
-                <Grid>
+                <!-- LanesHost is the scrolled content; pointer coords taken relative to it are
+                     content space (X = frame × PixelsPerFrame, Y = lane stack). The interaction
+                     layer's Preview handlers attach here so they tunnel ahead of ClipView.
+                     MinWidth/MinHeight track the viewport so the host always covers the visible
+                     area (a Grid in a ScrollViewer otherwise shrinks to its ~content size,
+                     leaving empty space below the lanes unable to receive a deselect click). -->
+                <Grid x:Name="LanesHost"
+                      Background="Transparent"
+                      MinWidth="{Binding ViewportWidth, ElementName=MainScroller}"
+                      MinHeight="{Binding ViewportHeight, ElementName=MainScroller}"
+                      PreviewMouseLeftButtonDown="OnLanesPreviewMouseLeftButtonDown"
+                      PreviewMouseMove="OnLanesPreviewMouseMove"
+                      PreviewMouseLeftButtonUp="OnLanesPreviewMouseLeftButtonUp">
                     <ItemsControl ItemsSource="{Binding Project.Tracks}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>

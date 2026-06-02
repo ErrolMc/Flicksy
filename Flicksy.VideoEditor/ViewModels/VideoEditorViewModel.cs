@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Flicksy.Drawing.Undo;
 using Flicksy.VideoEditor.Composition;
 using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
@@ -13,9 +14,11 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// Root view-model for the video editor shell. Owns the document <see cref="Project"/>
 /// plus the per-surface sub-VMs (<see cref="Preview"/>, <see cref="Transport"/>,
 /// <see cref="Timeline"/>, <see cref="Inspector"/>, <see cref="MediaBin"/>) and the shell
-/// UI state (selection, panel open/closed, rail tab). Undo/redo commands are no-ops in
-/// this slice; they exist so the shell's <c>Ctrl+Z</c>/<c>Ctrl+Y</c> input bindings have
-/// something to invoke until the timeline-edit undo stack lands in #12.
+/// UI state (selection, panel open/closed, rail tab). Owns the editor's <see cref="History"/>
+/// (one <see cref="UndoManager"/> per editor window, mirroring PostSnip's
+/// <c>DrawingViewModel.History</c>); the shell's <c>Ctrl+Z</c>/<c>Ctrl+Y</c> bindings and the
+/// toolbar Undo/Redo buttons invoke <c>History.UndoCommand</c>/<c>RedoCommand</c>. Timeline-edit
+/// commands push onto it as #12's gesture tools land.
 /// </summary>
 public partial class VideoEditorViewModel : ObservableObject, IDisposable
 {
@@ -101,6 +104,13 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<RailItem> RightRailItems { get; }
 
+    /// <summary>
+    /// The editor's undo stack. Timeline-edit gestures (#12) push before/after-snapshot
+    /// commands here; the toolbar buttons + Ctrl+Z/Ctrl+Y bind to its
+    /// <see cref="UndoManager.UndoCommand"/> / <see cref="UndoManager.RedoCommand"/>.
+    /// </summary>
+    public UndoManager History { get; } = new();
+
     partial void OnSelectedClipChanged(Clip? value)
     {
         if (Timeline.SelectedClip != value)
@@ -115,17 +125,6 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         {
             SelectedClip = Timeline.SelectedClip;
         }
-    }
-
-    [RelayCommand]
-    private void Undo()
-    {
-        // No-op in this slice. Real undo stack lands in #12 (timeline editing).
-    }
-
-    [RelayCommand]
-    private void Redo()
-    {
     }
 
     [RelayCommand]

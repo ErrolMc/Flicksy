@@ -60,7 +60,9 @@ public sealed class EraseTool : IDrawingTool
         }
         else if (_gestureRemovals.Count > 1)
         {
-            _viewModel.History.Push(new CompositeCommand(_viewModel, _gestureRemovals.ToArray()));
+            _viewModel.History.Push(new CompositeCommand(
+                _gestureRemovals.ToArray(),
+                new DrawingSelectionScope(_viewModel)));
         }
         _gestureRemovals.Clear();
 

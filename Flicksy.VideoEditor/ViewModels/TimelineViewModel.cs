@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flicksy.VideoEditor.Project;
@@ -13,6 +14,13 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// Selection is mirrored by <see cref="VideoEditorViewModel"/> so the right rail stays in
 /// sync — the timeline writes the user's click here and the root forwards to its own
 /// SelectedClip (and vice versa when selection is cleared elsewhere).
+/// <para>
+/// <see cref="SelectedClips"/> is the full multi-selection set (#12); <see cref="SelectedClip"/>
+/// is the <em>primary</em> — null iff the set is empty, and always a member of the set when
+/// non-null. The right rail / inspector continue to read the single primary, so their wiring
+/// is unchanged while multi-clip gestures (delete / split / move) operate on the set. The two
+/// are kept consistent by <see cref="SetSelection"/> / <see cref="OnSelectedClipChanged"/>.
+/// </para>
 /// </summary>
 public partial class TimelineViewModel : ObservableObject
 {
@@ -23,6 +31,11 @@ public partial class TimelineViewModel : ObservableObject
     // every clip edge on the target track plus the playhead. Tightens at high zoom and
     // loosens at low zoom because it's converted to frames via PixelsPerFrame at call time.
     private const double SnapRadiusPixels = 6.0;
+
+    // Guards the SelectedClip <-> SelectedClips sync so neither side's write re-triggers the
+    // other. SetSelection drives the set and lets OnSelectedClipChanged skip its own rebuild;
+    // a bare SelectedClip write (today's single-select click) rebuilds the set to match.
+    private bool _syncingSelection;
 
     [ObservableProperty]
     private double pixelsPerFrame = 6.0;
@@ -39,6 +52,90 @@ public partial class TimelineViewModel : ObservableObject
     public Project.Project Project { get; }
 
     public TransportViewModel Transport { get; }
+
+    /// <summary>
+    /// The full multi-selection set. Mutated through <see cref="SetSelection"/> (and, for a
+    /// single-select click, kept in sync from <see cref="OnSelectedClipChanged"/>) so the
+    /// invariant holds: <see cref="SelectedClip"/> is null iff this set is empty, and is always
+    /// a member of the set otherwise. Multi-clip gestures (delete / split / move) read this;
+    /// the right rail / inspector read the single <see cref="SelectedClip"/> primary.
+    /// </summary>
+    public ObservableCollection<Clip> SelectedClips { get; } = new();
+
+    /// <summary>
+    /// Replaces the selection with <paramref name="clips"/>, choosing <paramref name="primary"/>
+    /// (or the first clip when null/absent) as <see cref="SelectedClip"/>. Empty input clears
+    /// the selection. This is the entry point future multi-select gestures (marquee, Ctrl-click)
+    /// use; single-click selection still flows through a bare <see cref="SelectedClip"/> write.
+    /// </summary>
+    public void SetSelection(IEnumerable<Clip> clips, Clip? primary = null)
+    {
+        var distinct = clips?.Distinct().ToList() ?? new List<Clip>();
+
+        _syncingSelection = true;
+        try
+        {
+            SelectedClips.Clear();
+            foreach (var clip in distinct)
+            {
+                SelectedClips.Add(clip);
+            }
+
+            SelectedClip = distinct.Count == 0
+                ? null
+                : (primary is not null && distinct.Contains(primary) ? primary : distinct[0]);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    // A bare SelectedClip write (single-select click, or an external clear from the root VM)
+    // rebuilds the set to match: {clip} when non-null, empty when null. Skipped while
+    // SetSelection is mid-update so a multi-select isn't collapsed to its primary.
+    partial void OnSelectedClipChanged(Clip? value)
+    {
+        if (_syncingSelection) return;
+
+        SelectedClips.Clear();
+        if (value is not null)
+        {
+            SelectedClips.Add(value);
+        }
+    }
+
+    /// <summary>
+    /// Toggles <paramref name="clip"/> in the selection (Ctrl-click semantics). Adding makes
+    /// it the new primary; removing promotes another remaining clip (or clears to empty). The
+    /// "primary is null iff set is empty, else a member" invariant is preserved throughout.
+    /// </summary>
+    public void ToggleSelection(Clip clip)
+    {
+        if (clip is null) return;
+
+        _syncingSelection = true;
+        try
+        {
+            if (SelectedClips.Contains(clip))
+            {
+                SelectedClips.Remove(clip);
+                if (ReferenceEquals(SelectedClip, clip))
+                {
+                    SelectedClip = SelectedClips.Count > 0 ? SelectedClips[0] : null;
+                }
+            }
+            else
+            {
+                SelectedClips.Add(clip);
+                SelectedClip = clip;
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
 
     /// <summary>
     /// Multiplies <see cref="PixelsPerFrame"/> by <paramref name="factor"/>, clamped to the
@@ -185,9 +282,10 @@ public partial class TimelineViewModel : ObservableObject
     /// <see cref="ClipStreams.Audio"/>; <see cref="MediaClip.DisplayName"/> then renders it
     /// as "&lt;source&gt; (Audio)" on the timeline so users can tell the audio half from the
     /// video half without inspecting the track. Always creates a new track — never reuses
-    /// an existing audio track. Clips remain unlinked after split (they move independently).
+    /// an existing audio track. Clips remain unlinked afterward (they move independently).
+    /// Named "Detach audio" per CONTEXT.md — "Split" is reserved for the #12 razor operation.
     /// </summary>
-    public void SplitAudio(MediaClip clip)
+    public void DetachAudio(MediaClip clip)
     {
         if (clip.Streams != ClipStreams.Both) return;
 

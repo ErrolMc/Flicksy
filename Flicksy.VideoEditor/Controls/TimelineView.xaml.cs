@@ -2,8 +2,9 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using Flicksy.VideoEditor.Controls.Timeline;
+using Flicksy.VideoEditor.Interaction;
+using Flicksy.VideoEditor.Interaction.Tools;
 using Flicksy.VideoEditor.ViewModels;
 
 namespace Flicksy.VideoEditor.Controls;
@@ -14,29 +15,59 @@ namespace Flicksy.VideoEditor.Controls;
 /// <see cref="ScrollViewer"/>s: a top ruler scroller, a left pinned-headers scroller, and
 /// a main lanes scroller in the bottom-right. The main scroller owns the visible
 /// scrollbars; the other two have hidden scrollbars and are slaved to its H/V offsets via
-/// <see cref="OnMainScrollerScrollChanged"/>. Wheel + click handlers attach to the outer
-/// border so they fire over any sub-scroller. The wheel handler implements:
-/// <list type="bullet">
-///   <item><description>Plain wheel: horizontal pan.</description></item>
-///   <item><description>Shift + wheel: vertical pan.</description></item>
-///   <item><description>Ctrl + wheel: zoom <see cref="TimelineViewModel.PixelsPerFrame"/>
-///       centered on the current playhead.</description></item>
-/// </list>
-/// The deselect-on-click handler walks up from the click's <c>OriginalSource</c>; if a
-/// <see cref="ClipView"/> is on the path the click is a clip selection and selection is
-/// left alone, otherwise <c>SelectedClip</c> is cleared.
+/// <see cref="OnMainScrollerScrollChanged"/>. Wheel handler attaches to the outer border so
+/// it fires over any sub-scroller (plain = H-pan, Shift = V-pan, Ctrl = zoom on playhead).
+/// <para>
+/// This control is the <see cref="ITimelineSurface"/> host for the interaction layer (ADR
+/// 0007): it owns a <see cref="TimelineToolRouter"/> + the hit-zone tools, rebuilt when the
+/// bound VM changes (mirrors <c>DrawingView.OnDataContextChanged</c>). Pointer Preview handlers
+/// on <c>LanesHost</c> (the scrolled content, so coordinates are content space) forward to the
+/// router; click-select / click-deselect live in the Move / Marquee tools, not here.
+/// </para>
 /// </summary>
-public partial class TimelineView : UserControl
+public partial class TimelineView : UserControl, ITimelineSurface
 {
     private const double ZoomStep = 1.15;
     private const double PanLinesPerNotch = 3;
 
+    private readonly TimelineToolRouter _toolRouter;
+    private MoveTool? _moveTool;
+    private MarqueeTool? _marqueeTool;
+
     public TimelineView()
     {
         InitializeComponent();
+
+        // Hit-zone dispatch (ADR 0007 three-tier): Body → Move, edges → Trim (Move until the
+        // Trim tool lands in phase 4), None → Marquee. The router's active-gesture and
+        // selected-mode (Razor, phase 5) tiers sit in front of this selector.
+        _toolRouter = new TimelineToolRouter(zone => zone switch
+        {
+            HitZone.Body => _moveTool,
+            HitZone.LeftEdge => _moveTool,
+            HitZone.RightEdge => _moveTool,
+            _ => _marqueeTool,
+        });
+
+        DataContextChanged += OnDataContextChanged;
     }
 
     private TimelineViewModel? ViewModel => DataContext as TimelineViewModel;
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        // Tools live as long as the document they operate on; a VM swap means a fresh set.
+        if (e.NewValue is TimelineViewModel newVm)
+        {
+            _moveTool = new MoveTool(this, newVm);
+            _marqueeTool = new MarqueeTool(this, newVm);
+        }
+        else
+        {
+            _moveTool = null;
+            _marqueeTool = null;
+        }
+    }
 
     private void OnMainScrollerScrollChanged(object sender, ScrollChangedEventArgs e)
     {
@@ -52,23 +83,46 @@ public partial class TimelineView : UserControl
         }
     }
 
-    private void OnRootPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    // ---------- Interaction layer: Preview pointer forwarding ----------
+    // Handlers live on LanesHost (the scrolled content) so e.GetPosition(LanesHost) is already
+    // content space. Preview-tunnel so the router sees the down before ClipView does.
+
+    private void OnLanesPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var vm = ViewModel;
-        if (vm is null || vm.SelectedClip is null) return;
-        if (e.OriginalSource is DependencyObject source && IsInsideClipView(source)) return;
-        vm.SelectedClip = null;
+        if (ViewModel is null) return;
+
+        var point = e.GetPosition(LanesHost);
+        var hit = HitTest(point);
+        if (_toolRouter.OnPointerDown(point, hit, e))
+        {
+            e.Handled = true;
+        }
     }
 
-    private static bool IsInsideClipView(DependencyObject source)
+    private void OnLanesPreviewMouseMove(object sender, MouseEventArgs e)
     {
-        DependencyObject? current = source;
-        while (current is not null)
+        if (ViewModel is null) return;
+
+        var point = e.GetPosition(LanesHost);
+
+        if (_toolRouter.HasActiveGesture)
         {
-            if (current is ClipView) return true;
-            current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current);
+            _toolRouter.OnPointerMove(point, e);
+            return;
         }
-        return false;
+
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _toolRouter.OnPointerHover(point, HitTest(point), e);
+        }
+    }
+
+    private void OnLanesPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_toolRouter.HasActiveGesture)
+        {
+            _toolRouter.OnPointerUp(e.GetPosition(LanesHost), e);
+        }
     }
 
     private void OnRootPreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -116,4 +170,34 @@ public partial class TimelineView : UserControl
         var newOffset = Math.Max(0, newContentX - screenX);
         MainScroller.ScrollToHorizontalOffset(newOffset);
     }
+
+    // ---------- ITimelineSurface ----------
+
+    double ITimelineSurface.PixelsPerFrame => ViewModel?.PixelsPerFrame ?? 1.0;
+
+    double ITimelineSurface.TrackHeight => ClipsLaneView.TrackHeight;
+
+    Cursor? ITimelineSurface.Cursor
+    {
+        get => Cursor;
+        set => Cursor = value;
+    }
+
+    public TimelineHit HitTest(Point contentPoint)
+    {
+        var vm = ViewModel;
+        if (vm is null) return TimelineHit.Miss;
+        return TimelineHitTester.HitTest(
+            contentPoint.X,
+            contentPoint.Y,
+            vm.Project.Tracks,
+            vm.PixelsPerFrame,
+            ClipsLaneView.TrackHeight);
+    }
+
+    public Point GetContentPoint(MouseEventArgs e) => e.GetPosition(LanesHost);
+
+    void ITimelineSurface.CapturePointer() => LanesHost.CaptureMouse();
+
+    void ITimelineSurface.ReleasePointer() => LanesHost.ReleaseMouseCapture();
 }
