@@ -53,7 +53,10 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         _compositor = new SkiaCompositor();
         Transport = new TransportViewModel(project);
         Preview = new PreviewViewModel(project, Transport, _compositor);
-        Timeline = new TimelineViewModel(project, Transport);
+        // History is a property initializer (runs before this body) so it's non-null here;
+        // share the one UndoManager instance with the timeline so gesture tools and the
+        // toolbar Undo/Redo buttons push to / read from the same stack.
+        Timeline = new TimelineViewModel(project, Transport, History);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
 

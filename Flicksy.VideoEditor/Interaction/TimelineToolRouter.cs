@@ -67,6 +67,18 @@ public sealed class TimelineToolRouter
     }
 
     /// <summary>
+    /// Aborts the in-progress gesture (Esc): drops the captured tool and tells it to revert. The
+    /// host gates this on <see cref="HasActiveGesture"/>; the trailing physical pointer-up then
+    /// finds no active gesture and is ignored.
+    /// </summary>
+    public void CancelGesture()
+    {
+        var tool = _capturedTool;
+        _capturedTool = null;
+        tool?.Cancel();
+    }
+
+    /// <summary>
     /// Routes a no-button hover to the tool the point's zone would dispatch to (or the engaged
     /// mode tool), so edge-hover trim cursors appear without a click. An in-progress gesture is
     /// never in hover state by definition.

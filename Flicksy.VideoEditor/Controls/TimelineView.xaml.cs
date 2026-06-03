@@ -33,6 +33,7 @@ public partial class TimelineView : UserControl, ITimelineSurface
     private readonly TimelineToolRouter _toolRouter;
     private MoveTool? _moveTool;
     private MarqueeTool? _marqueeTool;
+    private Window? _hookedWindow;
 
     public TimelineView()
     {
@@ -50,6 +51,38 @@ public partial class TimelineView : UserControl, ITimelineSurface
         });
 
         DataContextChanged += OnDataContextChanged;
+        // Esc-cancel for an in-progress gesture. A captured pointer doesn't capture the keyboard,
+        // so listen at the owning window (PreviewKeyDown) rather than on this control, which never
+        // holds focus. Kept inside the surface host so the window stays ignorant of timeline tools.
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _hookedWindow = Window.GetWindow(this);
+        if (_hookedWindow is not null)
+        {
+            _hookedWindow.PreviewKeyDown += OnWindowPreviewKeyDown;
+        }
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_hookedWindow is not null)
+        {
+            _hookedWindow.PreviewKeyDown -= OnWindowPreviewKeyDown;
+            _hookedWindow = null;
+        }
+    }
+
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && _toolRouter.HasActiveGesture)
+        {
+            _toolRouter.CancelGesture();
+            e.Handled = true;
+        }
     }
 
     private TimelineViewModel? ViewModel => DataContext as TimelineViewModel;

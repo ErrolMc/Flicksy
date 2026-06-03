@@ -38,4 +38,10 @@ public interface ITimelineTool
 
     /// <summary>Pointer move while no button is pressed (cursor affordances, e.g. trim edges).</summary>
     void OnPointerHover(Point point, TimelineHit hit, MouseEventArgs e);
+
+    /// <summary>
+    /// Abort an in-progress gesture without committing it (Esc). Reverts any live mutation and
+    /// releases pointer capture; a no-op for tools that resolve fully on pointer-down.
+    /// </summary>
+    void Cancel();
 }

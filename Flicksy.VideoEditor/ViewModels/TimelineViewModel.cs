@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Flicksy.Drawing.Undo;
 using Flicksy.VideoEditor.Project;
 
 namespace Flicksy.VideoEditor.ViewModels;
@@ -43,15 +44,23 @@ public partial class TimelineViewModel : ObservableObject
     [ObservableProperty]
     private Clip? selectedClip;
 
-    public TimelineViewModel(Project.Project project, TransportViewModel transport)
+    public TimelineViewModel(Project.Project project, TransportViewModel transport, UndoManager history)
     {
         Project = project;
         Transport = transport;
+        History = history;
     }
 
     public Project.Project Project { get; }
 
     public TransportViewModel Transport { get; }
+
+    /// <summary>
+    /// The editor's undo stack, shared with <see cref="VideoEditorViewModel.History"/> (same
+    /// instance) so the toolbar buttons / Ctrl+Z / Ctrl+Y and the timeline gesture tools push
+    /// to one stack. Move / trim / split / delete commands (#12) are pushed here on gesture end.
+    /// </summary>
+    public UndoManager History { get; }
 
     /// <summary>
     /// The full multi-selection set. Mutated through <see cref="SetSelection"/> (and, for a
@@ -172,30 +181,50 @@ public partial class TimelineViewModel : ObservableObject
     /// Resolves a desired landing frame for a clip of <paramref name="draggedDuration"/>
     /// frames being placed on <paramref name="targetTrack"/>. Two-stage:
     /// (1) When <paramref name="altHeld"/> is false, snap the start edge to the nearest
-    /// candidate within <see cref="SnapRadiusPixels"/> (every clip's start + end on the
-    /// target track, plus <see cref="TransportViewModel.Playhead"/>). Alt bypasses this
-    /// stage.
+    /// candidate within <see cref="SnapRadiusPixels"/> — every clip's start + end <em>across
+    /// all tracks</em> (cross-track alignment), plus <see cref="TransportViewModel.Playhead"/>
+    /// and frame 0. Alt bypasses this stage.
     /// (2) Enforce the non-destructive overlap rule: if the resulting [start, start+duration)
     /// rect intersects any existing clip on the track, walk the start to the closest free
     /// gap that fits. Existing clips are never shifted. This stage runs regardless of Alt —
     /// the timeline always has non-overlapping clips per track.
-    /// Used by bin-to-timeline drops in <see cref="Controls.Timeline.ClipsLaneView"/>;
-    /// future clip-move-on-timeline operations will reuse the same helper.
+    /// <paramref name="excludeClips"/> are omitted from both stages — pass the clip(s) being
+    /// moved so they neither snap to their own edges nor block their own gap. Used by
+    /// bin-to-timeline drops (no exclusion) and single-clip move (exclude the dragged clip).
     /// </summary>
-    public int Snap(int landingFrame, Track targetTrack, int draggedDuration, bool altHeld)
+    public int Snap(int landingFrame, Track targetTrack, int draggedDuration, bool altHeld, IReadOnlyCollection<Clip>? excludeClips = null)
     {
         var frame = Math.Max(0, landingFrame);
 
         if (!altHeld && PixelsPerFrame > 0)
         {
-            frame = ApplyEdgeSnap(frame, targetTrack);
+            frame = ApplyEdgeSnap(frame, excludeClips);
         }
 
-        frame = WalkToFreeGap(frame, targetTrack, Math.Max(0, draggedDuration));
+        frame = WalkToFreeGap(frame, targetTrack, Math.Max(0, draggedDuration), excludeClips);
         return Math.Max(0, frame);
     }
 
-    private int ApplyEdgeSnap(int frame, Track targetTrack)
+    /// <summary>
+    /// Snaps a desired start frame to the nearest edge candidate (clip edges across all tracks,
+    /// playhead, frame 0) within <see cref="SnapRadiusPixels"/>, excluding <paramref name="excludeClips"/>.
+    /// The gap-walk stage of <see cref="Snap"/> is skipped — this is the edge-snap-only entry the
+    /// rigid multi-move group uses to snap its anchor's start without per-clip gap relocation.
+    /// </summary>
+    public int SnapStartEdge(int desiredStart, IReadOnlyCollection<Clip>? excludeClips = null)
+    {
+        var frame = Math.Max(0, desiredStart);
+        if (PixelsPerFrame > 0)
+        {
+            frame = ApplyEdgeSnap(frame, excludeClips);
+        }
+        return Math.Max(0, frame);
+    }
+
+    // Edge-snap candidates span every track (so clips align across lanes), plus the playhead
+    // and frame 0. excludeClips drops the moving clip(s)' own edges so a drag doesn't stick to
+    // where the clip already is.
+    private int ApplyEdgeSnap(int frame, IReadOnlyCollection<Clip>? excludeClips)
     {
         var snapRadiusFrames = SnapRadiusPixels / PixelsPerFrame;
         var best = frame;
@@ -211,30 +240,42 @@ public partial class TimelineViewModel : ObservableObject
             }
         }
 
-        foreach (var clip in targetTrack.Clips)
+        foreach (var track in Project.Tracks)
         {
-            Consider(clip.TimelineStart);
-            Consider(clip.TimelineStart + clip.Duration);
+            foreach (var clip in track.Clips)
+            {
+                if (excludeClips is not null && excludeClips.Contains(clip)) continue;
+                Consider(clip.TimelineStart);
+                Consider(clip.TimelineStart + clip.Duration);
+            }
         }
         Consider(Transport.Playhead);
+        Consider(0);
 
         return best;
     }
 
-    // Build the sorted list of occupied [start, end) intervals on the track, then either
-    // accept the desired placement (if it fits) or pick the gap-clamped placement closest
-    // to it. The tail gap is unbounded, so it's always a valid fallback at occupied[^1].End.
-    private static int WalkToFreeGap(int desiredStart, Track targetTrack, int draggedDuration)
+    // Build the sorted list of occupied [start, end) intervals on the track (skipping
+    // excludeClips), then either accept the desired placement (if it fits) or pick the
+    // gap-clamped placement closest to it. The tail gap is unbounded, so a valid placement
+    // always exists.
+    private static int WalkToFreeGap(int desiredStart, Track targetTrack, int draggedDuration, IReadOnlyCollection<Clip>? excludeClips = null)
     {
-        if (draggedDuration <= 0 || targetTrack.Clips.Count == 0)
+        if (draggedDuration <= 0)
         {
             return Math.Max(0, desiredStart);
         }
 
         var occupied = targetTrack.Clips
+            .Where(c => excludeClips is null || !excludeClips.Contains(c))
             .Select(c => (Start: c.TimelineStart, End: c.TimelineStart + Math.Max(1, c.Duration)))
             .OrderBy(i => i.Start)
             .ToList();
+
+        if (occupied.Count == 0)
+        {
+            return Math.Max(0, desiredStart);
+        }
 
         var desiredEnd = desiredStart + draggedDuration;
         var overlaps = occupied.Any(i => desiredStart < i.End && i.Start < desiredEnd);
@@ -271,6 +312,134 @@ public partial class TimelineViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Resolves a rigid-group frame delta to the value closest to <paramref name="desiredDelta"/>
+    /// that keeps every moved clip non-overlapping with the non-moved clips on its track and at or
+    /// after frame 0. <paramref name="moved"/> carries each moved clip with its <em>original</em>
+    /// start (deltas are relative to the gesture's start, not the live positions). The group keeps
+    /// its internal spacing and shifts as one; like a single-clip move it may <em>jump over</em> a
+    /// static clip into free space on the far side, settling on whichever fitting delta is nearest
+    /// the drag (never rippling or overwriting — ADR 0006). Delta 0 (the original layout) is always
+    /// a valid fallback. Single-clip moves use <see cref="Snap"/>; this is the multi-select path.
+    /// </summary>
+    public int ClampGroupDelta(IReadOnlyList<(Clip Clip, int OriginalStart)> moved, int desiredDelta)
+    {
+        if (moved is null || moved.Count == 0) return 0;
+
+        var movedSet = new HashSet<Clip>(moved.Count);
+        foreach (var m in moved) movedSet.Add(m.Clip);
+
+        // Frame-0 floor: the earliest-starting moved clip can't be pushed before 0.
+        var minStart = int.MaxValue;
+        foreach (var (_, originalStart) in moved) minStart = Math.Min(minStart, originalStart);
+        var lowerBound = -minStart;
+
+        // Each (moved clip, static neighbour on the same track) pair forbids an open delta
+        // interval: the moved span [s+d, e+d) overlaps the static [a, b) exactly when
+        // d is in (a - e, b - s). Endpoints are allowed (edges touching is non-overlapping).
+        var forbidden = new List<(int Lo, int Hi)>();
+        foreach (var (clip, originalStart) in moved)
+        {
+            var track = FindTrack(clip);
+            if (track is null) continue;
+
+            var start = originalStart;
+            var end = originalStart + Math.Max(1, clip.Duration);
+            foreach (var other in track.Clips)
+            {
+                if (movedSet.Contains(other)) continue;   // static neighbours only
+                var otherStart = other.TimelineStart;
+                var otherEnd = other.TimelineStart + Math.Max(1, other.Duration);
+                forbidden.Add((otherStart - end, otherEnd - start));
+            }
+        }
+
+        bool IsValid(int d)
+        {
+            if (d < lowerBound) return false;
+            foreach (var (lo, hi) in forbidden)
+            {
+                if (lo < d && d < hi) return false;
+            }
+            return true;
+        }
+
+        if (IsValid(desiredDelta)) return desiredDelta;
+
+        // Otherwise the nearest valid delta sits on a constraint boundary: the frame-0 floor, the
+        // original layout (delta 0, always overlap-free), or an edge of a forbidden interval.
+        var best = 0;
+        var bestDistance = Math.Abs((long)desiredDelta);
+        void Consider(int d)
+        {
+            if (!IsValid(d)) return;
+            var distance = Math.Abs((long)d - desiredDelta);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = d;
+            }
+        }
+
+        Consider(lowerBound);
+        foreach (var (lo, hi) in forbidden)
+        {
+            Consider(lo);
+            Consider(hi);
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="clip"/> may move onto <paramref name="target"/>: the target must
+    /// be unlocked and of the same <see cref="TrackKind"/> as the clip's current track (#12
+    /// cross-track rule — Streams are preserved, a different-kind target is refused).
+    /// </summary>
+    public bool CanMoveToTrack(Clip clip, Track target)
+    {
+        if (clip is null || target is null || target.Locked) return false;
+        var current = FindTrack(clip);
+        return current is not null && current.Kind == target.Kind;
+    }
+
+    /// <summary>The track that currently holds <paramref name="clip"/>, or null if none does.</summary>
+    public Track? FindTrack(Clip clip)
+    {
+        foreach (var track in Project.Tracks)
+        {
+            if (track.Clips.Contains(clip)) return track;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Moves <paramref name="clip"/> to <paramref name="toTrack"/> at <paramref name="newStart"/>,
+    /// removing it from whichever track currently holds it and re-inserting in TimelineStart order
+    /// so the destination stays sorted. Idempotent w.r.t. the clip's current location, so the
+    /// move-between-tracks command can drive both redo and undo through it.
+    /// </summary>
+    public void MoveClipToTrack(Clip clip, Track toTrack, int newStart)
+    {
+        var current = FindTrack(clip);
+        current?.Clips.Remove(clip);
+        clip.TimelineStart = Math.Max(0, newStart);
+        InsertSorted(toTrack, clip);
+    }
+
+    private static void InsertSorted(Track track, Clip clip)
+    {
+        var insertIdx = track.Clips.Count;
+        for (var i = 0; i < track.Clips.Count; i++)
+        {
+            if (track.Clips[i].TimelineStart > clip.TimelineStart)
+            {
+                insertIdx = i;
+                break;
+            }
+        }
+        track.Clips.Insert(insertIdx, clip);
+    }
+
+    /// <summary>
     /// Detaches the audio stream of a <see cref="ClipStreams.Both"/> <see cref="MediaClip"/>
     /// onto a freshly-appended audio track. No-op for any other clip shape (the menu item
     /// is greyed but still invokes through the visible-but-disabled pattern). The new track
@@ -289,15 +458,7 @@ public partial class TimelineViewModel : ObservableObject
     {
         if (clip.Streams != ClipStreams.Both) return;
 
-        Track? sourceTrack = null;
-        foreach (var track in Project.Tracks)
-        {
-            if (track.Clips.Contains(clip))
-            {
-                sourceTrack = track;
-                break;
-            }
-        }
+        var sourceTrack = FindTrack(clip);
         if (sourceTrack is null) return;
 
         // Resolve the source by id (per ADR 0003: never trust the denormalized Source ref).

@@ -54,4 +54,9 @@ public sealed class MarqueeTool : ITimelineTool
     {
         // No hover affordance over empty lane space.
     }
+
+    public void Cancel()
+    {
+        // Nothing to revert — the click resolves on pointer-down (rubber-band lands in phase 6).
+    }
 }
