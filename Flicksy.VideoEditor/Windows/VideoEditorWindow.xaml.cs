@@ -92,19 +92,47 @@ public partial class VideoEditorWindow : Window
         ViewModel.Dispose();
     }
 
-    // Spacebar toggles play/pause at the window level (standard NLE shortcut). Ignored while a
-    // text box has focus — the project-name box and inline clip/bin rename need the space key
-    // for typing. Handled here (PreviewKeyDown) so it overrides Space-activates-button on the
-    // transport buttons; IsRepeat is filtered so holding space doesn't flutter play/pause.
+    // Window-level NLE shortcuts. All are ignored while a text box has focus (the project-name box
+    // and inline clip/bin rename need the keys for typing) and on auto-repeat. Handled here
+    // (PreviewKeyDown) so Space overrides Space-activates-button on the transport buttons.
+    //   Space            — play/pause (any modifier, matching the prior behavior).
+    //   S / Delete / C   — split selection at playhead / delete selection / toggle razor mode.
+    // The edit keys are bare-key only so Ctrl/Alt chords (Ctrl+Z undo, a future Ctrl+S save) pass
+    // through. Esc-cancel + razor-exit live on TimelineView's window hook (it owns the tool router).
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
 
-        if (e.Key != Key.Space || e.IsRepeat) return;
+        if (e.IsRepeat) return;
         if (Keyboard.FocusedElement is TextBoxBase) return;
 
-        ViewModel.Transport.PlayPauseCommand.Execute(null);
-        e.Handled = true;
+        if (e.Key == Key.Space)
+        {
+            ViewModel.Transport.PlayPauseCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows)) != 0)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.S:
+                ViewModel.Timeline.SplitSelectedAtPlayheadCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Delete:
+                ViewModel.Timeline.DeleteSelectedCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.C:
+                ViewModel.Timeline.IsRazorMode = !ViewModel.Timeline.IsRazorMode;
+                e.Handled = true;
+                break;
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

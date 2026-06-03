@@ -51,6 +51,45 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+
+        <!-- Razor toggle: mirrors TransportButtonStyle but for a ToggleButton, with an accent
+             highlight when checked so the active razor mode is visible at a glance. -->
+        <Style x:Key="RazorToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinWidth" Value="56" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="Foreground" Value="{StaticResource TransportTextBrush}" />
+            <Setter Property="Background" Value="#2B2B2B" />
+            <Setter Property="BorderBrush" Value="#55FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="ToggleBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="#3A3A3A" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="#0078D4" />
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#0078D4" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Border BorderBrush="{StaticResource TransportBorderBrush}"
@@ -63,10 +102,25 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0"
-                       Style="{StaticResource TimecodeStyle}"
-                       HorizontalAlignment="Left"
-                       Text="{Binding CurrentTimecode}" />
+            <!-- Edit tools + current position. Split / Razor act on the timeline selection, which
+                 lives on the sibling TimelineViewModel — reached via the window's DataContext (this
+                 view's own DataContext is the TransportViewModel). -->
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <Button Style="{StaticResource TransportButtonStyle}"
+                        Content="Split"
+                        ToolTip="Split selected clips at the playhead (S)"
+                        Command="{Binding DataContext.Timeline.SplitSelectedAtPlayheadCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                <ToggleButton Style="{StaticResource RazorToggleStyle}"
+                              Content="Razor"
+                              ToolTip="Razor: click a clip to cut it at that point (C)"
+                              IsChecked="{Binding DataContext.Timeline.IsRazorMode, RelativeSource={RelativeSource AncestorType={x:Type Window}}, Mode=TwoWay}" />
+                <TextBlock Style="{StaticResource TimecodeStyle}"
+                           Margin="12,0,0,0"
+                           Text="{Binding CurrentTimecode}" />
+            </StackPanel>
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"

@@ -23,4 +23,17 @@ public partial class Transform2D : ObservableObject
 
     [ObservableProperty]
     private Rect? cropRect;
+
+    /// <summary>
+    /// Copies all fields from <paramref name="other"/> into this instance. Used when a clip is
+    /// split so each half gets an independent transform rather than sharing the original's
+    /// mutable instance.
+    /// </summary>
+    public void CopyFrom(Transform2D other)
+    {
+        Position = other.Position;
+        Scale = other.Scale;
+        RotationDegrees = other.RotationDegrees;
+        CropRect = other.CropRect;
+    }
 }

@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Flicksy.Drawing.Undo;
+using Flicksy.Drawing.Undo.Commands;
 using Flicksy.VideoEditor.Project;
+using Flicksy.VideoEditor.Undo;
+using Flicksy.VideoEditor.Undo.Commands;
 
 namespace Flicksy.VideoEditor.ViewModels;
 
@@ -49,11 +53,25 @@ public partial class TimelineViewModel : ObservableObject
     [ObservableProperty]
     private Clip? selectedClip;
 
+    // Razor mode (#12 phase 5). While true, TimelineView engages the RazorTool as the router's
+    // SelectedModeTool so a click cuts the clicked clip at the click point. Toggled by the C key /
+    // the razor toggle button; split-at-playhead (S / scissor) is independent of this flag.
+    [ObservableProperty]
+    private bool isRazorMode;
+
     public TimelineViewModel(Project.Project project, TransportViewModel transport, UndoManager history)
     {
         Project = project;
         Transport = transport;
         History = history;
+
+        // Keep the Split / Delete buttons' enabled state in step with the selection, so a click with
+        // nothing to act on greys the button out instead of firing a silent no-op command.
+        SelectedClips.CollectionChanged += (_, _) =>
+        {
+            SplitSelectedAtPlayheadCommand.NotifyCanExecuteChanged();
+            DeleteSelectedCommand.NotifyCanExecuteChanged();
+        };
     }
 
     public Project.Project Project { get; }
@@ -143,6 +161,31 @@ public partial class TimelineViewModel : ObservableObject
             {
                 SelectedClips.Add(clip);
                 SelectedClip = clip;
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// Removes <paramref name="clip"/> from the selection if present, promoting another member to
+    /// primary (or clearing to empty), preserving the "primary is null iff the set is empty" invariant.
+    /// No-op when the clip isn't selected. Used by delete-redo so a removed clip doesn't linger as the
+    /// selection.
+    /// </summary>
+    public void Deselect(Clip clip)
+    {
+        if (clip is null || !SelectedClips.Contains(clip)) return;
+
+        _syncingSelection = true;
+        try
+        {
+            SelectedClips.Remove(clip);
+            if (ReferenceEquals(SelectedClip, clip))
+            {
+                SelectedClip = SelectedClips.Count > 0 ? SelectedClips[0] : null;
             }
         }
         finally
@@ -430,6 +473,13 @@ public partial class TimelineViewModel : ObservableObject
         InsertSorted(toTrack, clip);
     }
 
+    /// <summary>
+    /// Re-inserts <paramref name="clip"/> into <paramref name="track"/> in TimelineStart order
+    /// without disturbing the other clips' sort. Used by the split / delete undo commands to restore
+    /// a removed clip (its TimelineStart is unchanged, so it lands back exactly where it was).
+    /// </summary>
+    public void InsertClipSorted(Track track, Clip clip) => InsertSorted(track, clip);
+
     private static void InsertSorted(Track track, Clip clip)
     {
         var insertIdx = track.Clips.Count;
@@ -607,5 +657,122 @@ public partial class TimelineViewModel : ObservableObject
 
         Project.Tracks.Add(audioTrack);
         clip.Streams = ClipStreams.Video;
+    }
+
+    /// <summary>
+    /// Splits <paramref name="clip"/> at <paramref name="frame"/> — the razor's cut-at-click entry
+    /// (<c>RazorTool</c> calls this). No-op unless the frame is strictly inside the clip on an
+    /// unlocked track. Pushes a single <c>SplitClipCommand</c> and selects the left half (the original).
+    /// </summary>
+    public void SplitClipAt(MediaClip clip, int frame)
+    {
+        var command = CreateSplit(clip, frame);
+        if (command is null) return;
+        History.Push(command);
+        SelectedClip = clip;   // the original is now the left half
+    }
+
+    /// <summary>
+    /// Splits every selected <see cref="MediaClip"/> the playhead strictly passes through, at the
+    /// playhead frame (the <c>S</c> key / scissor button). Non-MediaClips, clips on locked tracks,
+    /// and clips the playhead sits at or outside the edges of are skipped (no zero-length halves).
+    /// The originally-selected clips stay selected (each as its left half). Bundles multiple splits
+    /// in a <c>CompositeCommand</c>; a no-op when nothing splits.
+    /// </summary>
+    private bool CanSplitSelected() => SelectedClips.Any(c => c is MediaClip);
+
+    [RelayCommand(CanExecute = nameof(CanSplitSelected))]
+    private void SplitSelectedAtPlayhead()
+    {
+        var frame = Transport.Playhead;
+        var commands = new List<IUndoableCommand>();
+        foreach (var clip in SelectedClips.OfType<MediaClip>().ToList())
+        {
+            var command = CreateSplit(clip, frame);
+            if (command is not null) commands.Add(command);
+        }
+        PushBundle(commands);
+    }
+
+    /// <summary>
+    /// Deletes every selected <see cref="Clip"/> on an unlocked track (generic — Media and Graphics
+    /// alike), leaving each vacated span as a gap (non-destructive — ADR 0006). Any transition a
+    /// deleted clip participated in is removed with it. Clears the selection and bundles multiple
+    /// deletes in a <c>CompositeCommand</c>; a no-op when nothing deletes (e.g. an all-locked selection).
+    /// </summary>
+    private bool CanDeleteSelected() => SelectedClips.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
+    private void DeleteSelected()
+    {
+        var commands = new List<IUndoableCommand>();
+        foreach (var clip in SelectedClips.ToList())
+        {
+            var track = FindTrack(clip);
+            if (track is null || track.Locked) continue;   // locked tracks are inert (ADR 0006)
+
+            var before = track.Transitions.ToList();
+            track.RemoveTransitionsFor(clip);
+            track.Clips.Remove(clip);
+            var after = track.Transitions.ToList();
+            commands.Add(new RemoveClipCommand(this, track, clip, before, after));
+        }
+
+        if (commands.Count == 0) return;
+        SetSelection(Array.Empty<Clip>());
+        PushBundle(commands);
+    }
+
+    // Performs the split mutation for one clip and returns the (already-applied) command, or null
+    // when the clip can't split here. The original is kept as the left half, so right-edge transitions
+    // reassign to the new right half while left-edge ones stay put (Track.ReassignTransitionsForSplit).
+    private SplitClipCommand? CreateSplit(MediaClip clip, int frame)
+    {
+        var track = FindTrack(clip);
+        if (track is null || track.Locked) return null;
+
+        var start = clip.TimelineStart;
+        var duration = clip.Duration;
+        if (frame <= start || frame >= start + duration) return null;   // strictly inside → both halves >= 1 frame
+
+        var sourceOutBefore = clip.SourceOut;
+
+        // Source time at the split frame via the speed mapping (matches CompositionPlanner.ComputeSourceTime).
+        var elapsedFrames = frame - start;
+        var splitSourceTime = clip.SourceIn + TimeSpan.FromSeconds(elapsedFrames * clip.Speed / clip.Framerate);
+
+        var right = new MediaClip
+        {
+            MediaSourceId = clip.MediaSourceId,
+            Source = clip.Source,
+            SourceIn = splitSourceTime,
+            SourceOut = sourceOutBefore,
+            Speed = clip.Speed,
+            Volume = clip.Volume,
+            Streams = clip.Streams,
+            Framerate = clip.Framerate,
+            Name = clip.Name,
+            TimelineStart = frame,
+        };
+        right.Transform.CopyFrom(clip.Transform);
+        foreach (var filter in clip.Filters) right.Filters.Add(filter);
+
+        var transitionsBefore = track.Transitions.ToList();
+        clip.SourceOut = splitSourceTime;        // shrink the original into the left half (Duration recomputes)
+        InsertSorted(track, right);
+        track.ReassignTransitionsForSplit(clip, clip, right);
+        var transitionsAfter = track.Transitions.ToList();
+
+        return new SplitClipCommand(this, track, clip, right, sourceOutBefore, splitSourceTime, transitionsBefore, transitionsAfter);
+    }
+
+    // Pushes a single command directly, or bundles several into one CompositeCommand undo step with a
+    // TimelineSelectionScope so the whole selection survives the multi-step undo/redo.
+    private void PushBundle(IReadOnlyList<IUndoableCommand> commands)
+    {
+        if (commands.Count == 0) return;
+        History.Push(commands.Count == 1
+            ? commands[0]
+            : new CompositeCommand(commands, new TimelineSelectionScope(this)));
     }
 }

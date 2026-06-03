@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -34,6 +35,7 @@ public partial class TimelineView : UserControl, ITimelineSurface
     private MoveTool? _moveTool;
     private TrimTool? _trimTool;
     private MarqueeTool? _marqueeTool;
+    private RazorTool? _razorTool;
     private Window? _hookedWindow;
 
     public TimelineView()
@@ -79,9 +81,18 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && _toolRouter.HasActiveGesture)
+        if (e.Key != Key.Escape) return;
+
+        // Esc first cancels an in-progress gesture; otherwise it exits razor mode. A captured pointer
+        // doesn't capture the keyboard, so this listens at the owning window, not on this control.
+        if (_toolRouter.HasActiveGesture)
         {
             _toolRouter.CancelGesture();
+            e.Handled = true;
+        }
+        else if (ViewModel is { IsRazorMode: true } vm)
+        {
+            vm.IsRazorMode = false;
             e.Handled = true;
         }
     }
@@ -90,19 +101,45 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (e.OldValue is TimelineViewModel oldVm)
+        {
+            oldVm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
         // Tools live as long as the document they operate on; a VM swap means a fresh set.
         if (e.NewValue is TimelineViewModel newVm)
         {
             _moveTool = new MoveTool(this, newVm);
             _trimTool = new TrimTool(this, newVm);
             _marqueeTool = new MarqueeTool(this, newVm);
+            _razorTool = new RazorTool(this, newVm);
+            newVm.PropertyChanged += OnViewModelPropertyChanged;
+            ApplyRazorMode(newVm.IsRazorMode);
         }
         else
         {
             _moveTool = null;
             _trimTool = null;
             _marqueeTool = null;
+            _razorTool = null;
         }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TimelineViewModel.IsRazorMode) && sender is TimelineViewModel vm)
+        {
+            ApplyRazorMode(vm.IsRazorMode);
+        }
+    }
+
+    // Engage / disengage the razor as the router's selected-mode tool. Setting the cursor here gives
+    // an immediate affordance on toggle; the razor tool's Hover refines it per hit-zone as the
+    // pointer moves (crosshair over a clip, arrow over empty lane).
+    private void ApplyRazorMode(bool on)
+    {
+        _toolRouter.SelectedModeTool = on ? _razorTool : null;
+        Cursor = on ? Cursors.Cross : null;
     }
 
     private void OnMainScrollerScrollChanged(object sender, ScrollChangedEventArgs e)
