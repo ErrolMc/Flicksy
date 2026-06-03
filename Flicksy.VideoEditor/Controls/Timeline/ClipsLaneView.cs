@@ -307,19 +307,10 @@ public sealed class ClipsLaneView : Canvas
                 TimelineStart = snapped,
             };
 
-            // Insert in TimelineStart order so the underlying collection stays sorted —
-            // makes downstream gap/edge logic (snap, overlap walk) deterministic.
-            var insertIdx = Track.Clips.Count;
-            for (var i = 0; i < Track.Clips.Count; i++)
-            {
-                if (Track.Clips[i].TimelineStart > snapped)
-                {
-                    insertIdx = i;
-                    break;
-                }
-            }
-            Track.Clips.Insert(insertIdx, clip);
-            Timeline.SelectedClip = clip;
+            // Insert (sorted) + select + push the undo entry as one edit. The VM keeps the
+            // collection in TimelineStart order so downstream gap/edge logic (snap, overlap walk)
+            // stays deterministic, and records an AddClipCommand so the drop is undoable.
+            Timeline.AddClip(Track, clip);
             e.Effects = DragDropEffects.Copy;
             e.Handled = true;
         }

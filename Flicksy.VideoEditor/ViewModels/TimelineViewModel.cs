@@ -660,6 +660,21 @@ public partial class TimelineViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Adds an already-constructed <paramref name="clip"/> to <paramref name="track"/> as one undoable
+    /// edit — the model side of a media-bin drag-drop (<c>ClipsLaneView</c> builds the clip from the
+    /// drop's stream resolution + snapped landing frame, then calls this). Inserts in TimelineStart
+    /// order, selects the new clip, and pushes an <see cref="AddClipCommand"/> so the drop is reversible.
+    /// Owning the mutation here (rather than in the lane's drop handler) keeps it unit-testable, mirroring
+    /// split / delete.
+    /// </summary>
+    public void AddClip(Track track, Clip clip)
+    {
+        InsertSorted(track, clip);
+        SelectedClip = clip;
+        History.Push(new AddClipCommand(this, track, clip));
+    }
+
+    /// <summary>
     /// Splits <paramref name="clip"/> at <paramref name="frame"/> — the razor's cut-at-click entry
     /// (<c>RazorTool</c> calls this). No-op unless the frame is strictly inside the clip on an
     /// unlocked track. Pushes a single <c>SplitClipCommand</c> and selects the left half (the original).
