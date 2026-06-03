@@ -43,4 +43,14 @@ public interface ITimelineSurface
 
     /// <summary>Release a previously captured pointer.</summary>
     void ReleasePointer();
+
+    /// <summary>
+    /// Shows or updates the marquee rubber-band at <paramref name="contentRect"/> (content space,
+    /// same space as <see cref="GetContentPoint"/>) on the timeline-wide lanes container's adorner
+    /// layer — not a single lane, so the band spans tracks. Called on each move of a marquee drag.
+    /// </summary>
+    void ShowMarquee(Rect contentRect);
+
+    /// <summary>Removes the marquee rubber-band. Safe to call when none is shown.</summary>
+    void HideMarquee();
 }

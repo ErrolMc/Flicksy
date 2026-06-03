@@ -83,6 +83,60 @@ public static class TimelineHitTester
     }
 
     /// <summary>
+    /// Returns every <see cref="Clip"/> whose painted span intersects the content-space rectangle
+    /// (<paramref name="left"/> / <paramref name="top"/> / <paramref name="width"/> /
+    /// <paramref name="height"/>) across all tracks — the marquee multi-select hit-test (#12 phase
+    /// 6). <c>Locked</c> tracks are skipped (inert per ADR 0006). Results are track-major (top lane
+    /// first) then left-to-right within a track, so the first entry is the natural primary
+    /// selection. A zero-area rectangle selects nothing.
+    /// <para>
+    /// Horizontal containment uses the same half-open painted pixel span <see cref="HitTest"/> does
+    /// (<c>[leftPx, rightPx)</c>); vertical containment uses the lane band
+    /// (<c>[laneTop, laneBottom)</c> — the full <paramref name="trackHeight"/> row, not the clip's
+    /// inset visual), so a band grazing a track row selects the clips it horizontally covers without
+    /// pixel-precise vertical aim.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<Clip> ClipsIntersecting(
+        double left,
+        double top,
+        double width,
+        double height,
+        IReadOnlyList<Track> tracks,
+        double pixelsPerFrame,
+        double trackHeight)
+    {
+        if (tracks is null) throw new ArgumentNullException(nameof(tracks));
+
+        var result = new List<Clip>();
+        if (pixelsPerFrame <= 0 || trackHeight <= 0) return result;
+        if (width <= 0 || height <= 0) return result;   // a zero-area band selects nothing
+
+        var right = left + width;
+        var bottom = top + height;
+
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            var track = tracks[i];
+            if (track.Locked) continue;   // inert per ADR 0006 — never marquee-selectable
+
+            var laneTop = i * trackHeight;
+            var laneBottom = laneTop + trackHeight;
+            if (bottom <= laneTop || top >= laneBottom) continue;   // no vertical overlap with this lane
+
+            foreach (var clip in track.Clips)
+            {
+                var leftPx = clip.TimelineStart * pixelsPerFrame;
+                var rightPx = leftPx + Math.Max(1, clip.Duration) * pixelsPerFrame;
+                if (right <= leftPx || left >= rightPx) continue;   // no horizontal overlap with this clip
+                result.Add(clip);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Maps a content-space X to a timeline frame (rounded to nearest). Shared with the view's
     /// scrub math so a click resolves to the same frame the playhead would seek to.
     /// </summary>

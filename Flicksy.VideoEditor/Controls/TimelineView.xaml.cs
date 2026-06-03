@@ -2,7 +2,9 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using Flicksy.VideoEditor.Controls.Timeline;
 using Flicksy.VideoEditor.Interaction;
 using Flicksy.VideoEditor.Interaction.Tools;
@@ -36,6 +38,7 @@ public partial class TimelineView : UserControl, ITimelineSurface
     private TrimTool? _trimTool;
     private MarqueeTool? _marqueeTool;
     private RazorTool? _razorTool;
+    private MarqueeAdorner? _marqueeAdorner;
     private Window? _hookedWindow;
 
     public TimelineView()
@@ -273,4 +276,72 @@ public partial class TimelineView : UserControl, ITimelineSurface
     void ITimelineSurface.CapturePointer() => LanesHost.CaptureMouse();
 
     void ITimelineSurface.ReleasePointer() => LanesHost.ReleaseMouseCapture();
+
+    // The marquee band lives on LanesHost's adorner layer (the MainScroller's ScrollContentPresenter
+    // layer — same one ClipsLaneView's drag-ghost uses), so it spans every lane and is positioned in
+    // LanesHost content space, matching the rect the MarqueeTool builds from captured content points.
+    void ITimelineSurface.ShowMarquee(Rect contentRect)
+    {
+        var layer = AdornerLayer.GetAdornerLayer(LanesHost);
+        if (layer is null) return;
+        if (_marqueeAdorner is null)
+        {
+            _marqueeAdorner = new MarqueeAdorner(LanesHost);
+            layer.Add(_marqueeAdorner);
+        }
+        _marqueeAdorner.UpdateRect(contentRect);
+    }
+
+    void ITimelineSurface.HideMarquee()
+    {
+        if (_marqueeAdorner is null) return;
+        var layer = AdornerLayer.GetAdornerLayer(LanesHost);
+        layer?.Remove(_marqueeAdorner);
+        _marqueeAdorner = null;
+    }
+}
+
+/// <summary>
+/// Translucent rubber-band rectangle painted on the lanes container's <see cref="AdornerLayer"/>
+/// during a marquee multi-select drag (#12 phase 6). Lives on the timeline-wide <c>LanesHost</c>
+/// (not a single lane) so the band spans tracks; its rect is in <c>LanesHost</c> content space, the
+/// same space <see cref="MarqueeTool"/> builds the drag rect in. Hit-test-transparent so it never
+/// intercepts the gesture. Mirrors <c>GhostClipAdorner</c>'s shape.
+/// </summary>
+internal sealed class MarqueeAdorner : Adorner
+{
+    private static readonly Brush Fill = CreateFill();
+    private static readonly Pen Border = CreateBorder();
+    private Rect _rect;
+
+    public MarqueeAdorner(UIElement adornedElement) : base(adornedElement)
+    {
+        IsHitTestVisible = false;
+    }
+
+    public void UpdateRect(Rect rect)
+    {
+        _rect = rect;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        if (_rect.Width <= 0 || _rect.Height <= 0) return;
+        dc.DrawRectangle(Fill, Border, _rect);
+    }
+
+    private static Brush CreateFill()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(0x33, 0x4D, 0x9D, 0xE0));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static Pen CreateBorder()
+    {
+        var pen = new Pen(new SolidColorBrush(Color.FromArgb(0xCC, 0x4D, 0x9D, 0xE0)), 1.0);
+        pen.Freeze();
+        return pen;
+    }
 }

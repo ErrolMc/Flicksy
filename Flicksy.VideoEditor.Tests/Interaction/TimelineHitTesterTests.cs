@@ -159,10 +159,143 @@ public class TimelineHitTesterTests
         Assert.Throws<ArgumentNullException>(() => TimelineHitTester.HitTest(0, 0, null!, Ppf, TrackHeight));
     }
 
+    // ---- ClipsIntersecting (marquee, #12 phase 6) ---------------------------
+    // Layout shared by these cases: clip A on lane 0 (Video) spans px [60, 420);
+    // clip B on lane 1 (Audio) spans px [600, 780). Lane 0 Y = [0, 56), lane 1 Y = [56, 112).
+
+    [Test]
+    public void ClipsIntersecting_BandSpanningBothLanes_SelectsClipsOnBoth()
+    {
+        var (tracks, a, b) = TwoTrackLayout();
+        // X [0, 700) covers A's start and reaches into B; Y [10, 70) straddles both lanes.
+        var hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { a, b }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_BandInFirstLaneOnly_SelectsOnlyFirstTrackClip()
+    {
+        var (tracks, a, _) = TwoTrackLayout();
+        // Y [10, 50) stays inside lane 0, so B on lane 1 is excluded even though X reaches it.
+        var hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { a }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_BandLeftOfEveryClip_SelectsNothing()
+    {
+        var (tracks, _, _) = TwoTrackLayout();
+        // X [0, 50) ends before A's left px (60); nothing overlaps horizontally.
+        var hits = Intersect(left: 0, top: 0, width: 50, height: 112, tracks);
+        Assert.That(hits, Is.Empty);
+    }
+
+    [Test]
+    public void ClipsIntersecting_PartialHorizontalOverlap_Selects()
+    {
+        var (tracks, a, _) = TwoTrackLayout();
+        // Band covers only A's first few pixels [55, 90) — partial overlap still selects.
+        var hits = Intersect(left: 55, top: 10, width: 35, height: 30, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { a }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_HalfOpenAtClipStart_Excludes()
+    {
+        var (tracks, _, _) = TwoTrackLayout();
+        // Band right edge exactly at A's left px (60): [leftPx, rightPx) is half-open, so a band
+        // ending at the start pixel doesn't grab it (consistent with HitTest's pixel model).
+        var hits = Intersect(left: 0, top: 10, width: 60, height: 30, tracks);
+        Assert.That(hits, Is.Empty);
+        // One pixel further and it's inside.
+        Assert.That(Intersect(left: 0, top: 10, width: 61, height: 30, tracks), Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void ClipsIntersecting_HalfOpenAtClipEnd_Excludes()
+    {
+        var (tracks, _, _) = TwoTrackLayout();
+        // Band left edge exactly at A's right px (420): a band starting at the end pixel misses it.
+        var hits = Intersect(left: 420, top: 10, width: 100, height: 30, tracks);
+        Assert.That(hits, Is.Empty);
+    }
+
+    [Test]
+    public void ClipsIntersecting_LockedTrack_IsSkipped()
+    {
+        var (tracks, _, b) = TwoTrackLayout();
+        tracks[0].Locked = true;   // lane 0 (clip A) is inert
+        // A band covering both lanes now returns only B — A's locked lane is skipped.
+        var hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { b }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_DisabledTrack_IsStillSelectable()
+    {
+        var (tracks, a, _) = TwoTrackLayout();
+        tracks[0].Disabled = true;   // Disabled is compositor-skip only — still editable / selectable
+        var hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { a }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_OrdersTrackMajorThenLeftToRight()
+    {
+        var tracks = Tracks(TrackKind.Video);
+        var right = MediaClip(timelineStart: 100, sourceSeconds: 1);   // px [600, 780)
+        var left = MediaClip(timelineStart: 10, sourceSeconds: 1);     // px [60, 240)
+        tracks[0].Clips.Add(right);                                    // added out of order
+        tracks[0].Clips.Add(left);
+        // Within a track the result follows Clips order; this asserts the method preserves it
+        // (the primary picker downstream takes result[0]).
+        var hits = Intersect(left: 0, top: 10, width: 800, height: 40, tracks);
+        Assert.That(hits, Is.EqualTo(new Clip[] { right, left }));
+    }
+
+    [Test]
+    public void ClipsIntersecting_ZeroAreaRect_SelectsNothing()
+    {
+        var (tracks, _, _) = TwoTrackLayout();
+        Assert.That(Intersect(left: 100, top: 10, width: 0, height: 30, tracks), Is.Empty);
+        Assert.That(Intersect(left: 100, top: 10, width: 30, height: 0, tracks), Is.Empty);
+    }
+
+    [Test]
+    public void ClipsIntersecting_NonPositivePixelsPerFrame_IsEmpty()
+    {
+        var (tracks, _, _) = TwoTrackLayout();
+        Assert.That(
+            TimelineHitTester.ClipsIntersecting(0, 0, 700, 112, tracks, 0, TrackHeight),
+            Is.Empty);
+    }
+
+    [Test]
+    public void ClipsIntersecting_NullTracks_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => TimelineHitTester.ClipsIntersecting(0, 0, 10, 10, null!, Ppf, TrackHeight));
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private static TimelineHit Hit(double x, double y, IReadOnlyList<Track> tracks) =>
         TimelineHitTester.HitTest(x, y, tracks, Ppf, TrackHeight, EdgePx);
+
+    private static IReadOnlyList<Clip> Intersect(
+        double left, double top, double width, double height, IReadOnlyList<Track> tracks) =>
+        TimelineHitTester.ClipsIntersecting(left, top, width, height, tracks, Ppf, TrackHeight);
+
+    // Clip A on lane 0 (Video) spans px [60, 420); clip B on lane 1 (Audio) spans px [600, 780).
+    private static (List<Track> Tracks, Clip A, Clip B) TwoTrackLayout()
+    {
+        var tracks = Tracks(TrackKind.Video, TrackKind.Audio);
+        var a = MediaClip(timelineStart: 10, sourceSeconds: 2);    // [10, 70) frames → px [60, 420)
+        var b = MediaClip(timelineStart: 100, sourceSeconds: 1);   // [100, 130) frames → px [600, 780)
+        tracks[0].Clips.Add(a);
+        tracks[1].Clips.Add(b);
+        return (tracks, a, b);
+    }
 
     private static List<Track> Tracks(params TrackKind[] kinds)
     {
