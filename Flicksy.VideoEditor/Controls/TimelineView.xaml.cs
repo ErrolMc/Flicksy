@@ -32,6 +32,7 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private readonly TimelineToolRouter _toolRouter;
     private MoveTool? _moveTool;
+    private TrimTool? _trimTool;
     private MarqueeTool? _marqueeTool;
     private Window? _hookedWindow;
 
@@ -39,14 +40,14 @@ public partial class TimelineView : UserControl, ITimelineSurface
     {
         InitializeComponent();
 
-        // Hit-zone dispatch (ADR 0007 three-tier): Body → Move, edges → Trim (Move until the
-        // Trim tool lands in phase 4), None → Marquee. The router's active-gesture and
-        // selected-mode (Razor, phase 5) tiers sit in front of this selector.
+        // Hit-zone dispatch (ADR 0007 three-tier): Body → Move, edges → Trim, None → Marquee. The
+        // router's active-gesture and selected-mode (Razor, phase 5) tiers sit in front of this
+        // selector.
         _toolRouter = new TimelineToolRouter(zone => zone switch
         {
             HitZone.Body => _moveTool,
-            HitZone.LeftEdge => _moveTool,
-            HitZone.RightEdge => _moveTool,
+            HitZone.LeftEdge => _trimTool,
+            HitZone.RightEdge => _trimTool,
             _ => _marqueeTool,
         });
 
@@ -93,11 +94,13 @@ public partial class TimelineView : UserControl, ITimelineSurface
         if (e.NewValue is TimelineViewModel newVm)
         {
             _moveTool = new MoveTool(this, newVm);
+            _trimTool = new TrimTool(this, newVm);
             _marqueeTool = new MarqueeTool(this, newVm);
         }
         else
         {
             _moveTool = null;
+            _trimTool = null;
             _marqueeTool = null;
         }
     }

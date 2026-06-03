@@ -52,7 +52,9 @@ public sealed class MarqueeTool : ITimelineTool
 
     public void OnPointerHover(Point point, TimelineHit hit, MouseEventArgs e)
     {
-        // No hover affordance over empty lane space.
+        // Default cursor over empty lane space / inert (locked) tracks. Reset here so moving off a
+        // clip body or edge (which set Hand / resize via their tools) restores the arrow.
+        _surface.Cursor = null;
     }
 
     public void Cancel()

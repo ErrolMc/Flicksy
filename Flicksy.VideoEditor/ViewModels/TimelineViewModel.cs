@@ -33,6 +33,11 @@ public partial class TimelineViewModel : ObservableObject
     // loosens at low zoom because it's converted to frames via PixelsPerFrame at call time.
     private const double SnapRadiusPixels = 6.0;
 
+    // Floating-point guard when converting source-time headroom into whole-frame trim bounds:
+    // a true integer that underflowed (e.g. 89.9999998) floors up correctly without inflating a
+    // genuinely fractional value.
+    private const double FrameEpsilon = 1e-6;
+
     // Guards the SelectedClip <-> SelectedClips sync so neither side's write re-triggers the
     // other. SetSelection drives the set and lets OnSelectedClipChanged skip its own rebuild;
     // a bare SelectedClip write (today's single-select click) rebuilds the set to match.
@@ -437,6 +442,113 @@ public partial class TimelineViewModel : ObservableObject
             }
         }
         track.Clips.Insert(insertIdx, clip);
+    }
+
+    /// <summary>
+    /// Resolves a single-edge trim of <paramref name="clip"/>, returning the clamped
+    /// <see cref="TrimResult"/> (the gesture applies it live; <c>TrimClipCommand</c> records
+    /// before/after). Dragging the <paramref name="fromLeftEdge"/> edge to
+    /// <paramref name="desiredEdgeFrame"/> — the desired new start when trimming the left edge, the
+    /// desired new end when trimming the right — maps the timeline delta into source time via the
+    /// clip's <see cref="MediaClip.Speed"/>, holding the opposite edge fixed (so
+    /// <see cref="MediaClip.Duration"/> recomputes to match). Clamped, in order, by: the
+    /// neighbouring clip's edge on the same track (trim never ripples a neighbour — ADR 0006), the
+    /// source bounds (<c>SourceIn &gt;= 0</c>, <c>SourceOut &lt;= Source.Duration</c>), and a
+    /// 1-frame minimum duration. A broken / missing-source clip (<see cref="MediaClip.IsBroken"/>)
+    /// may shrink but not extend, since its true source length can't be trusted. Single-clip only —
+    /// trim never operates on the whole selection.
+    /// </summary>
+    public TrimResult ResolveTrim(MediaClip clip, bool fromLeftEdge, int desiredEdgeFrame)
+    {
+        var start = clip.TimelineStart;
+        var duration = clip.Duration;
+
+        // A degenerate (zero-length) clip has no edge worth trimming; leaving it untouched also
+        // keeps the clamps below from inverting (lower > upper).
+        if (duration < 1) return TrimResult.Capture(clip);
+
+        var end = start + duration;
+        var track = FindTrack(clip);
+        var canExtend = !clip.IsBroken;
+        var source = Project.MediaSources.FirstOrDefault(s => s.Id == clip.MediaSourceId) ?? clip.Source;
+
+        // Source seconds spanned by one timeline frame at this clip's speed. Speed and Framerate
+        // are both > 0 here (otherwise Duration would be 0 and we returned above).
+        var sourcePerFrame = clip.Speed / clip.Framerate;
+
+        if (fromLeftEdge)
+        {
+            // Left (in-point): the start slides, the right edge stays put, SourceIn shifts with it.
+            var upper = end - 1;                                   // 1-frame minimum
+            var lower = Math.Max(0, PrevClipEnd(track, clip, start));
+            if (!canExtend)
+            {
+                lower = Math.Max(lower, start);                    // shrink only
+            }
+            else
+            {
+                // SourceIn can't drop below zero: cap how far left the start may slide.
+                var maxLeftFrames = (int)Math.Floor(clip.SourceIn.TotalSeconds / sourcePerFrame + FrameEpsilon);
+                lower = Math.Max(lower, start - maxLeftFrames);
+            }
+
+            var newStart = Math.Clamp(desiredEdgeFrame, lower, upper);
+            var newSourceIn = clip.SourceIn + TimeSpan.FromSeconds((newStart - start) * sourcePerFrame);
+            if (newSourceIn < TimeSpan.Zero) newSourceIn = TimeSpan.Zero;   // float guard
+            return new TrimResult(newStart, newSourceIn, clip.SourceOut);
+        }
+        else
+        {
+            // Right (out-point): the end slides, start + SourceIn stay put, SourceOut shifts.
+            var lower = start + 1;                                 // 1-frame minimum
+            var upper = NextClipStart(track, clip, end);           // neighbour, or no timeline cap
+            if (!canExtend)
+            {
+                upper = Math.Min(upper, end);                      // shrink only
+            }
+            else if (source is not null)
+            {
+                // SourceOut can't exceed the source length: cap how far right the end may slide.
+                var headroomFrames = (int)Math.Floor((source.Duration - clip.SourceOut).TotalSeconds / sourcePerFrame + FrameEpsilon);
+                upper = Math.Min(upper, end + Math.Max(0, headroomFrames));
+            }
+
+            var newEnd = Math.Clamp(desiredEdgeFrame, lower, upper);
+            var newSourceOut = clip.SourceOut + TimeSpan.FromSeconds((newEnd - end) * sourcePerFrame);
+            if (source is not null && newSourceOut > source.Duration) newSourceOut = source.Duration;   // float guard
+            return new TrimResult(start, clip.SourceIn, newSourceOut);
+        }
+    }
+
+    // Greatest end frame among clips entirely left of `start` on the track (clips never overlap, so
+    // every other clip is wholly left or wholly right). Frame 0 when there's no left neighbour — the
+    // left edge can't be trimmed before the track origin regardless.
+    private static int PrevClipEnd(Track? track, Clip clip, int start)
+    {
+        if (track is null) return 0;
+        var best = 0;
+        foreach (var c in track.Clips)
+        {
+            if (ReferenceEquals(c, clip)) continue;
+            var cEnd = c.TimelineStart + Math.Max(1, c.Duration);
+            if (cEnd <= start && cEnd > best) best = cEnd;
+        }
+        return best;
+    }
+
+    // Smallest start frame among clips entirely right of `end` on the track, or int.MaxValue when
+    // there's no right neighbour (no timeline cap — the source bound then governs).
+    private static int NextClipStart(Track? track, Clip clip, int end)
+    {
+        if (track is null) return int.MaxValue;
+        var best = int.MaxValue;
+        foreach (var c in track.Clips)
+        {
+            if (ReferenceEquals(c, clip)) continue;
+            var cStart = c.TimelineStart;
+            if (cStart >= end && cStart < best) best = cStart;
+        }
+        return best;
     }
 
     /// <summary>

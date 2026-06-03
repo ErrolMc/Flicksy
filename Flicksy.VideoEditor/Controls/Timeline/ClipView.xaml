@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:proj="clr-namespace:Flicksy.VideoEditor.Project"
              x:Name="Root"
-             Cursor="Hand"
              SnapsToDevicePixels="True">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />

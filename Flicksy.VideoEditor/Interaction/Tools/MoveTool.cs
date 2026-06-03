@@ -138,8 +138,10 @@ public sealed class MoveTool : ITimelineTool
 
     public void OnPointerHover(Point point, TimelineHit hit, MouseEventArgs e)
     {
-        // ClipView sets a Hand cursor over its body; the resize cursor on edges lands with Trim
-        // (phase 4). No extra affordance needed here yet.
+        // Move grab affordance over a clip body. Cursor management migrated off ClipView into the
+        // tools so the Trim tool's resize cursor on edges isn't shadowed by a clip-wide cursor (a
+        // child's Cursor wins WPF's QueryCursor). The body routes here; edges route to TrimTool.
+        _surface.Cursor = hit.Clip is not null ? Cursors.Hand : null;
     }
 
     public void Cancel()
