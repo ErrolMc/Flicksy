@@ -615,6 +615,9 @@ public partial class TimelineViewModel : ObservableObject
     /// video half without inspecting the track. Always creates a new track — never reuses
     /// an existing audio track. Clips remain unlinked afterward (they move independently).
     /// Named "Detach audio" per CONTEXT.md — "Split" is reserved for the #12 razor operation.
+    /// Reversible as one undo step bundling an <see cref="AddTrackCommand"/>, an
+    /// <see cref="AddClipCommand"/>, and a <see cref="ChangeClipStreamsCommand"/> — granular so a
+    /// future detach onto an existing track can reuse the latter two and drop the track add.
     /// </summary>
     public void DetachAudio(MediaClip clip)
     {
@@ -644,7 +647,7 @@ public partial class TimelineViewModel : ObservableObject
         // tracks bin renames of the source. The user can override that with the rename
         // menu; if they do, the override freezes.
         var audioTrack = new Track { Kind = TrackKind.Audio, Name = trackName };
-        audioTrack.Clips.Add(new MediaClip
+        var audioClip = new MediaClip
         {
             MediaSourceId = clip.MediaSourceId,
             Source = source,
@@ -653,10 +656,22 @@ public partial class TimelineViewModel : ObservableObject
             Streams = ClipStreams.Audio,
             Framerate = clip.Framerate,
             TimelineStart = clip.TimelineStart,
-        });
+        };
 
+        // Mutate live (push-after-mutate convention), then bundle the inverse of each step into one
+        // undo entry. Three granular commands rather than a single "detach" command so a future
+        // detach-onto-an-existing-track can keep the clip add + stream flip and drop the track add.
+        var trackIndex = Project.Tracks.Count;   // appended at the end
         Project.Tracks.Add(audioTrack);
+        audioTrack.Clips.Add(audioClip);
         clip.Streams = ClipStreams.Video;
+
+        PushBundle(new IUndoableCommand[]
+        {
+            new AddTrackCommand(this, audioTrack, trackIndex),
+            new AddClipCommand(this, audioTrack, audioClip),
+            new ChangeClipStreamsCommand(clip, ClipStreams.Both, ClipStreams.Video),
+        });
     }
 
     /// <summary>
