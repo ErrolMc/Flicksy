@@ -621,7 +621,7 @@ public partial class TimelineViewModel : ObservableObject
         if (clip.Streams != ClipStreams.Both) return;
 
         var sourceTrack = FindTrack(clip);
-        if (sourceTrack is null) return;
+        if (sourceTrack is null || sourceTrack.Locked) return;   // locked tracks are inert (ADR 0006)
 
         // Resolve the source by id (per ADR 0003: never trust the denormalized Source ref).
         // Fallback to the local ref so a clip wired before id-lookup works (e.g. tests).

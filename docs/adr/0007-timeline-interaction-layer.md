@@ -30,6 +30,6 @@
 ## Consequences
 
 - **New folder `Flicksy.VideoEditor/Interaction/`**: `ITimelineTool`, `ITimelineSurface`, `TimelineToolRouter`, and the Move / Trim / Marquee / Razor tools.
-- **#7's click-select and #9's bin-drop handling move into the interaction layer**; `ClipView` is reduced to rendering + context menu + rename.
+- **#7's click-select moves into the interaction layer; #9's bin-drop stays per-lane in `ClipsLaneView`** (revised in #12 phase 7 — Windows OLE drag-drop doesn't hit the pointer-capture / adorner-clipping problems the timeline-wide surface solves, so relocating it buys nothing); `ClipView` is reduced to rendering + context menu + rename.
 - **Input bindings**: the scissor button = split selected at playhead; `C` = Razor mode; `S` / `Delete` / `Esc`-cancel handled in `VideoEditorWindow.OnPreviewKeyDown`, gated on `TextBoxBase` focus like `Space`.
 - **Undo wiring** (same feature): an `UndoManager` instance on `VideoEditorViewModel` (mirroring PostSnip's `DrawingViewModel.History`), a new `Flicksy.VideoEditor/Undo/Commands/` holding `TrimClipCommand` / `SplitClipCommand` / `MoveClipCommand` / `RemoveClipCommand` / `MoveClipBetweenTracksCommand`, and a generalised `CompositeCommand` extracted in `Flicksy.Drawing/Undo` to drop its `DrawingViewModel` coupling so both surfaces can bundle multi-clip edits.

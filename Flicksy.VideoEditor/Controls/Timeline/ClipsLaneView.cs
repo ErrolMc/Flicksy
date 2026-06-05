@@ -287,7 +287,9 @@ public sealed class ClipsLaneView : Canvas
         {
             var source = TryGetMediaSource(e);
             if (source is null || Track is null || Timeline is null) return;
-            var streams = ResolveStreams(source, Track.Kind);
+            // A locked track is inert (ADR 0006): refuse every drop. Null streams falls through
+            // to the early return below, same as a kind/stream-matrix or missing-source refusal.
+            var streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
             if (streams is null) return;
 
             var framerate = Timeline.Project.Settings.Framerate;
@@ -333,7 +335,9 @@ public sealed class ClipsLaneView : Canvas
             return;
         }
 
-        var streams = ResolveStreams(source, Track.Kind);
+        // A locked track is inert (ADR 0006): refuse every drop. Null streams routes into the
+        // refused branch below (red tint, no ghost), same as a kind/stream-matrix refusal.
+        var streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
         if (streams is null)
         {
             e.Effects = DragDropEffects.None;

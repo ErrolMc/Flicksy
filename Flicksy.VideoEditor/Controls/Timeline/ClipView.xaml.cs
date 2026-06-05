@@ -76,11 +76,24 @@ public partial class ClipView : UserControl
         if (DataContext is not Clip clip) return;
         var timeline = FindTimelineViewModel();
         if (timeline is null) return;
+
+        // A clip on a locked track is inert (ADR 0006): no right-click select, and the menu
+        // is suppressed in OnContextMenuOpening. Bail before selecting.
+        if (timeline.FindTrack(clip)?.Locked == true) return;
+
         timeline.SelectedClip = clip;
     }
 
     private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
+        // A clip on a locked track is inert (ADR 0006) — suppress the whole menu so its edit
+        // items (Rename / Detach audio) can't run on a frozen track.
+        if (DataContext is Clip clip && FindTimelineViewModel()?.FindTrack(clip)?.Locked == true)
+        {
+            e.Handled = true;
+            return;
+        }
+
         // Visible-but-disabled gating. Rename is enabled for any MediaClip (rename target
         // is the per-clip Name override on MediaClip). Detach audio additionally requires
         // Streams=Both — the spec wants users to discover both items even when they don't
