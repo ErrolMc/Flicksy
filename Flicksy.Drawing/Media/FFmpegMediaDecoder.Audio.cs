@@ -211,16 +211,35 @@ public sealed partial class FFmpegMediaDecoder
     private bool DecodeNextSourceChunk()
     {
         if (_file is null) return false;
-        if (!_file.Audio.TryGetNextFrame(out var data)) return false;
+
         try
         {
-            _srcChunkLen = CopyRemixedToSrcChunk(data);
-            _srcChunkPos = 0;
-            return _srcChunkLen > 0;
+            if (!_file.Audio.TryGetNextFrame(out var data)) return false;
+            try
+            {
+                _srcChunkLen = CopyRemixedToSrcChunk(data);
+                _srcChunkPos = 0;
+                return _srcChunkLen > 0;
+            }
+            finally
+            {
+                data.Dispose();
+            }
         }
-        finally
+        catch
         {
-            data.Dispose();
+            // FFMediaToolkit throws (e.g. AVERROR_INVALIDDATA, "Invalid data found when
+            // processing input") on a corrupt/un-decodable packet instead of returning false.
+            // This fires when two clips of the same source decode at once (overlapping across
+            // tracks): two MediaFile contexts demux the same file and one lands on a bad packet.
+            // Treat it as a discontinuity: end this chunk so the caller emits silence, and drop
+            // the positioned flag so the next call re-seeks past the bad packet and recovers
+            // (mirrors SeekAudio's catch). Must never reach NAudio's render thread — matches
+            // GetVideoFrameAt swallowing video decode errors.
+            _srcChunkLen = 0;
+            _srcChunkPos = 0;
+            _audioPositioned = false;
+            return false;
         }
     }
 
