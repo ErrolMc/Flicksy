@@ -27,13 +27,16 @@ public interface ICompositor : IDisposable
 {
     /// <summary>
     /// Paint one composited frame into <paramref name="target"/>, a caller-owned
-    /// <see cref="WriteableBitmap"/> whose dimensions must equal the project resolution
-    /// (<c>ProjectSettings.{ResolutionWidth, ResolutionHeight}</c>). The compositor
-    /// <c>Lock</c>s the bitmap, blits the layer stack into its back buffer, marks it dirty,
-    /// and <c>Unlock</c>s — the bound <c>Image</c> repaints in place, so the caller need
-    /// not reassign its <c>Image.Source</c> between frames. Throws
-    /// <see cref="System.ArgumentException"/> when <paramref name="target"/>'s size differs
-    /// from the project resolution.
+    /// <see cref="WriteableBitmap"/>. The target's dimensions define the render scale: the
+    /// layer stack is positioned in project-resolution coordinates
+    /// (<c>ProjectSettings.{ResolutionWidth, ResolutionHeight}</c>) and scaled to fit the
+    /// target. A full-resolution bitmap renders 1:1 (export / canonical path); a smaller one
+    /// renders a proxy, lower-quality preview (ADR 0008) — every per-clip transform/crop still
+    /// reasons in project pixels, so only fidelity differs. The compositor <c>Lock</c>s the
+    /// bitmap, blits into its back buffer, marks it dirty, and <c>Unlock</c>s — the bound
+    /// <c>Image</c> repaints in place, so the caller need not reassign its <c>Image.Source</c>
+    /// between frames. Throws <see cref="System.ArgumentException"/> only when
+    /// <paramref name="target"/> has a non-positive dimension.
     /// </summary>
     void RenderFrame(Project.Project project, int frame, WriteableBitmap target);
 }

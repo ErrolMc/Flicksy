@@ -1,6 +1,8 @@
 # Compositor design
 
 > **Amended by [ADR 0005](0005-playback-threading-and-audio.md):** #11 moves `RenderAudio` out of `ICompositor` into a separate `IAudioMixer`, and resolves the playback threading model this ADR defers to #11 (v1 is UI-thread; off-thread decode-ahead is phase 2). The decisions below stand except where 0005 supersedes them.
+>
+> **Amended by [ADR 0008](0008-proxy-mode-preview-rendering.md):** proxy-mode preview rendering (deferred below) is now implemented — the preview may hand `RenderFrame` a sub-resolution target and the compositor scales the project-space layer stack to fit. "Always render at project resolution" still holds for export and the canonical path; the preview is the documented exception.
 
 ## Decision
 
@@ -30,7 +32,7 @@ _Amended by ADR 0005: `RenderAudio` has moved to a separate `IAudioMixer`; `ICom
 
 `IVideoPlayer` stays as-is; PostSnip continues to use it. A follow-up issue (#23) tracks PostSnip's eventual migration onto `IMediaDecoder` + a thin playback clock.
 
-**Render resolution.** Always at `ProjectSettings.{ResolutionWidth, ResolutionHeight}`. Preview surface scales via WPF's `Stretch=Uniform`. Export uses the same path. Proxy-mode (lower-resolution preview rendering) is deferred to its own issue.
+**Render resolution.** Always at `ProjectSettings.{ResolutionWidth, ResolutionHeight}`. Preview surface scales via WPF's `Stretch=Uniform`. Export uses the same path. Proxy-mode (lower-resolution preview rendering) is now implemented in [ADR 0008](0008-proxy-mode-preview-rendering.md).
 
 **Track flags introduced by this work.** Three new fields on `Track`:
 

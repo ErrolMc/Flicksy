@@ -110,8 +110,12 @@ The unit of work a `Compositor` consumes per frame — one entry per visible `Cl
 _Avoid_: "render layer" (no concept of nested layers in the model).
 
 **Composited frame**:
-The compositor's per-frame visual output — the pixels painted into the caller-owned `WriteableBitmap` at project resolution (not a distinct type; the caller owns and reuses one bitmap, see [ADR 0004](adr/0004-compositor-design.md)). Backend-neutral — GPU implementations produce the same surface via readback.
+The compositor's per-frame visual output — the pixels painted into the caller-owned `WriteableBitmap` at project resolution, or a smaller target at reduced **preview quality** (not a distinct type; the caller owns and reuses one bitmap, see [ADR 0004](adr/0004-compositor-design.md) and [ADR 0008](adr/0008-proxy-mode-preview-rendering.md)). Backend-neutral — GPU implementations produce the same surface via readback.
 _Avoid_: "rendered frame" (collides with raw decoded frames from a `MediaDecoder`).
+
+**Preview quality (playback resolution)**:
+A view-only setting that renders the **preview** at a fraction of project resolution (`Full` / `½` / `¼` / `⅛`) for cheaper playback and scrubbing — on the fly, like Premiere's "Playback Resolution". The `Compositor` scales the project-space layer stack into a smaller target bitmap **and** decodes each video source at the matching `TargetVideoSize`; all per-clip transforms and crops stay in project coordinates, and the preview's `Stretch=Uniform` scales the result back to full display size. Transient per editor window (lives on `PreviewViewModel`, not the serialized `Project`); never affects export. See [ADR 0008](adr/0008-proxy-mode-preview-rendering.md).
+_Avoid_: "proxy" / "proxy mode" for this (reserve "proxy media" for the separate, unbuilt pre-transcoded-file workflow), "low-quality mode", "draft mode"; applying it to export (export is always full resolution).
 
 **Media decoder**:
 Per-source primitive that produces raw video frames or audio samples from a single source file at a given `SourceTime`. Pull-shaped (synchronous `GetVideoFrameAt(t)` / `GetAudioSamplesAt(t, n)`), no playback clock. Distinct from `IVideoPlayer`, which is push-shaped and owns its own clock for the snip editor's video playback. Lives in `Flicksy.Drawing/Media/` so it's available to both surfaces; the eventual unification of PostSnip's playback onto `IMediaDecoder` is tracked in issue #23.

@@ -19,6 +19,14 @@ namespace Flicksy.VideoEditor.Composition;
 /// class only owns paint dispatch and the (video) decoder cache. Audio mixing moved to
 /// <see cref="AudioMixer"/> per ADR 0005.
 /// <para>
+/// Render scale: the target bitmap's size is the physical surface; the project resolution is
+/// the logical space layers position in. A target smaller than the project (proxy /
+/// preview-quality mode — ADR 0008) is painted via a single canvas pre-scale, so every
+/// per-layer transform/crop stays in project pixels. Export passes a full-resolution target
+/// (scale 1). The scale is derived from the target size, so <see cref="RenderFrame"/> needs
+/// no extra parameter.
+/// </para>
+/// <para>
 /// Threading: per <see cref="ICompositor"/>, calls are single-call-in-flight on one
 /// thread at a time; the class is not thread-safe across concurrent callers.
 /// <see cref="RenderFrame"/> paints into the caller's unfrozen
@@ -44,13 +52,19 @@ public sealed class SkiaCompositor : ICompositor
         int height = project.Settings.ResolutionHeight;
         int sampleRate = project.Settings.AudioSampleRate;
 
-        // Caller owns the bitmap and reuses it across frames (no per-frame allocation).
-        // It must be exactly project resolution: InstallPixels maps the SKImageInfo
-        // straight over the back buffer, so a size mismatch would read/write out of bounds.
-        if (target.PixelWidth != width || target.PixelHeight != height)
+        // The caller owns the bitmap and reuses it across frames (no per-frame allocation).
+        // Its size is the *physical* render target; the project resolution is the *logical*
+        // space every layer is positioned in. A target smaller than the project (proxy /
+        // preview-quality mode — ADR 0008) paints the same project-space layer stack scaled
+        // down to fit; export passes a full-resolution bitmap and gets scale 1. InstallPixels
+        // maps the SKImageInfo straight over the back buffer, so the info and the dirty rect
+        // must use the target's actual dimensions, not the project's.
+        int targetWidth = target.PixelWidth;
+        int targetHeight = target.PixelHeight;
+        if (targetWidth <= 0 || targetHeight <= 0)
         {
             throw new ArgumentException(
-                $"Target bitmap is {target.PixelWidth}x{target.PixelHeight}; expected project resolution {width}x{height}.",
+                $"Target bitmap has non-positive size {targetWidth}x{targetHeight}.",
                 nameof(target));
         }
 
@@ -58,19 +72,30 @@ public sealed class SkiaCompositor : ICompositor
         try
         {
             // Pbgra32 + SKAlphaType.Premul: WPF's only fully blendable format pair.
-            var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            var info = new SKImageInfo(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
             using var skBitmap = new SKBitmap();
             skBitmap.InstallPixels(info, target.BackBuffer, target.BackBufferStride);
             using var canvas = new SKCanvas(skBitmap);
 
             canvas.Clear(SKColors.Black);
 
+            // Proxy pre-scale: map the full project-resolution coordinate space onto the
+            // (possibly smaller) target. Layers keep reasoning in project pixels; this single
+            // scale shrinks the whole stack. At full resolution sx = sy = 1 (identity). Each
+            // layer Save()s, Concat()s its source->project matrix onto this base, then
+            // Restore()s, so the base scale persists across the layer loop.
+            canvas.Scale((float)targetWidth / width, (float)targetHeight / height);
+
+            // Decode scale = render scale: at reduced preview quality the decoders also emit
+            // smaller frames (ADR 0008), so convert/copy/raster shrink too, not just present.
+            double decodeScale = (double)targetWidth / width;
+
             var layers = CompositionPlanner.PlanFrame(project, frame);
             foreach (var layer in layers)
             {
                 // Audio-only layers don't contribute to the visual frame.
                 if (layer.Track.Kind == TrackKind.Audio) continue;
-                PaintLayer(canvas, layer, width, height, sampleRate);
+                PaintLayer(canvas, layer, width, height, sampleRate, decodeScale);
             }
         }
         finally
@@ -79,7 +104,7 @@ public sealed class SkiaCompositor : ICompositor
             // Image repaints in place — the caller need not reassign its source each frame.
             // The bitmap stays unfrozen (it's reused), so presentation must be same-thread
             // per the ADR 0004 contract.
-            target.AddDirtyRect(new Int32Rect(0, 0, width, height));
+            target.AddDirtyRect(new Int32Rect(0, 0, targetWidth, targetHeight));
             target.Unlock();
         }
     }
@@ -93,12 +118,12 @@ public sealed class SkiaCompositor : ICompositor
 
     // ---- Paint dispatch -----------------------------------------------------
 
-    private void PaintLayer(SKCanvas canvas, CompositionLayer layer, int projectWidth, int projectHeight, int sampleRate)
+    private void PaintLayer(SKCanvas canvas, CompositionLayer layer, int projectWidth, int projectHeight, int sampleRate, double decodeScale)
     {
         switch (layer.Clip)
         {
             case MediaClip mediaClip when mediaClip.Streams != ClipStreams.Audio:
-                PaintMediaClip(canvas, layer, mediaClip, projectWidth, projectHeight, sampleRate);
+                PaintMediaClip(canvas, layer, mediaClip, projectWidth, projectHeight, sampleRate, decodeScale);
                 break;
             case GraphicsClip graphicsClip:
                 PaintGraphicsClip(canvas, graphicsClip, projectWidth, projectHeight);
@@ -107,17 +132,25 @@ public sealed class SkiaCompositor : ICompositor
         }
     }
 
-    private void PaintMediaClip(SKCanvas canvas, CompositionLayer layer, MediaClip clip, int projectWidth, int projectHeight, int sampleRate)
+    private void PaintMediaClip(SKCanvas canvas, CompositionLayer layer, MediaClip clip, int projectWidth, int projectHeight, int sampleRate, double decodeScale)
     {
         if (clip.IsBroken) return;
 
-        var decoder = _decoders.GetOrCreate(clip, sampleRate);
+        var decoder = _decoders.GetOrCreate(clip, sampleRate, decodeScale);
         if (decoder is null || !decoder.HasVideo) return;
 
         var maybeFrame = decoder.GetVideoFrameAt(layer.SourceTime);
         if (maybeFrame is null) return;
 
         var videoFrame = maybeFrame.Value;
+
+        // The transform and crop reason in NATIVE source pixels (clip.Source.Width/Height); the
+        // decoded frame may be smaller under preview downscale (ADR 0008). Fall back to the frame's
+        // own size when native dims are unknown.
+        var source = clip.Source;
+        int nativeWidth = source is { Width: > 0 } ? source.Width : videoFrame.Width;
+        int nativeHeight = source is { Height: > 0 } ? source.Height : videoFrame.Height;
+
         try
         {
             // Pin the rented byte[] so Skia can read it directly. SKImage.FromPixels does
@@ -128,13 +161,26 @@ public sealed class SkiaCompositor : ICompositor
                 var srcInfo = new SKImageInfo(videoFrame.Width, videoFrame.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
                 using var image = SKImage.FromPixels(srcInfo, handle.AddrOfPinnedObject(), videoFrame.Stride);
 
-                var (matrix, srcRect) = BuildLayerMatrix(clip.Transform, videoFrame.Width, videoFrame.Height, projectWidth, projectHeight);
+                // Matrix maps the NATIVE source extent -> project, so transforms/crops stay
+                // resolution-independent regardless of the decoded frame's size.
+                var (matrix, srcRect) = BuildLayerMatrix(clip.Transform, nativeWidth, nativeHeight, projectWidth, projectHeight);
 
                 canvas.Save();
-                canvas.SetMatrix(matrix);
+                // Concat (not SetMatrix) so the global preview-quality pre-scale on the canvas
+                // composes with this layer's source->project matrix: total = qualityScale * matrix.
+                canvas.Concat(matrix);
                 if (srcRect is { } crop)
                 {
                     canvas.ClipRect(crop);
+                }
+                // Map the (possibly smaller) decoded frame onto the native source extent so a
+                // downscaled preview frame composites identically, just at lower fidelity.
+                // Identity when frame == native (Full quality).
+                if (videoFrame.Width != nativeWidth || videoFrame.Height != nativeHeight)
+                {
+                    canvas.Concat(SKMatrix.CreateScale(
+                        (float)nativeWidth / videoFrame.Width,
+                        (float)nativeHeight / videoFrame.Height));
                 }
                 canvas.DrawImage(image, 0, 0);
                 canvas.Restore();
@@ -190,7 +236,8 @@ public sealed class SkiaCompositor : ICompositor
             var (matrix, _) = BuildLayerMatrix(clip.Transform, projectWidth, projectHeight, projectWidth, projectHeight);
 
             canvas.Save();
-            canvas.SetMatrix(matrix);
+            // Concat (not SetMatrix) so the canvas's global proxy pre-scale is preserved.
+            canvas.Concat(matrix);
             canvas.DrawImage(image, 0, 0);
             canvas.Restore();
         }

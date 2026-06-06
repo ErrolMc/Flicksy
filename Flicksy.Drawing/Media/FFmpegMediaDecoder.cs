@@ -39,7 +39,7 @@ public sealed partial class FFmpegMediaDecoder : IMediaDecoder
     public int VideoWidth { get; private set; }
     public int VideoHeight { get; private set; }
 
-    public FFmpegMediaDecoder(string path, int targetSampleRate)
+    public FFmpegMediaDecoder(string path, int targetSampleRate, System.Drawing.Size? targetVideoSize = null)
     {
         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Path is required.", nameof(path));
         if (targetSampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(targetSampleRate));
@@ -51,6 +51,14 @@ public sealed partial class FFmpegMediaDecoder : IMediaDecoder
             StreamsToLoad = MediaMode.AudioVideo,
             VideoPixelFormat = ImagePixelFormat.Bgra32,
         };
+        // On-the-fly preview downscale (ADR 0008): when a smaller target is requested, swscale
+        // rescales decoded frames to this size, cutting the BGRA convert + copy + downstream raster
+        // cost. The raw codec decode is unaffected (swscale runs post-decode). Frames returned by
+        // GetVideoFrameAt are then at this size; VideoWidth/Height stay informational.
+        if (targetVideoSize is { Width: > 0, Height: > 0 } size)
+        {
+            options.TargetVideoSize = size;
+        }
         _file = MediaFile.Open(Path.GetFullPath(path), options);
 
         HasVideo = _file.HasVideo;
