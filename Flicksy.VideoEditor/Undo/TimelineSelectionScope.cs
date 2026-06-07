@@ -28,12 +28,13 @@ public sealed class TimelineSelectionScope : ICompositeSelectionScope
 
     public void Restore(object? token)
     {
-        if (token is not Snapshot snapshot) return;
+        if (token is not Snapshot snapshot) 
+            return;
 
         // Drop any clip a child command removed from the document (e.g. a delete bundle) so we
         // never re-select a clip that no longer lives on a track.
-        var present = snapshot.Clips.Where(c => _viewModel.FindTrack(c) is not null).ToList();
-        var primary = snapshot.Primary is not null && present.Contains(snapshot.Primary) ? snapshot.Primary : null;
+        List<Clip> present = snapshot.Clips.Where(c => _viewModel.FindTrack(c) is not null).ToList();
+        Clip? primary = snapshot.Primary is not null && present.Contains(snapshot.Primary) ? snapshot.Primary : null;
         _viewModel.SetSelection(present, primary);
     }
 

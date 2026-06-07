@@ -97,7 +97,7 @@ public partial class PostSnipViewModel : ObservableObject
 
             if (e.PropertyName == nameof(ImageEditToolsViewModel.IsSelectActive))
             {
-                var keepTextSelection = imageEditTools.IsTextActive
+                bool keepTextSelection = imageEditTools.IsTextActive
                     && drawing.SelectedItem is TextItem;
 
                 SelectionOverlay.IsActive = imageEditTools.IsSelectActive
@@ -196,7 +196,7 @@ public partial class PostSnipViewModel : ObservableObject
             return;
         }
 
-        var sourceExtension = Path.GetExtension(MediaPath);
+        string? sourceExtension = Path.GetExtension(MediaPath);
         if (string.IsNullOrWhiteSpace(sourceExtension))
         {
             sourceExtension = IsVideo ? ".mp4" : ".png";
@@ -238,8 +238,10 @@ public partial class PostSnipViewModel : ObservableObject
 
     private bool HasEffectiveCrop()
     {
-        if (!CropOverlay.HasImage) return false;
-        var crop = CropOverlay.EffectiveCrop;
+        if (!CropOverlay.HasImage) 
+            return false;
+
+        Rect crop = CropOverlay.EffectiveCrop;
         return crop.X > 0
             || crop.Y > 0
             || crop.Width < CropOverlay.ImageWidth
@@ -248,34 +250,34 @@ public partial class PostSnipViewModel : ObservableObject
 
     private void SaveImageWithDrawing(BitmapSource source, string destinationPath)
     {
-        var width = source.Width;
-        var height = source.Height;
-        var crop = HasEffectiveCrop()
+        double width = source.Width;
+        double height = source.Height;
+        Rect crop = HasEffectiveCrop()
             ? CropOverlay.EffectiveCrop
             : new Rect(0, 0, width, height);
 
         var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
+        using (DrawingContext dc = visual.RenderOpen())
         {
             // Offset so the crop origin maps to (0,0) in the rendered output.
             dc.PushTransform(new TranslateTransform(-crop.X, -crop.Y));
             dc.DrawImage(source, new Rect(0, 0, width, height));
 
-            foreach (var item in Drawing.Items)
+            foreach (DrawingItem item in Drawing.Items)
             {
                 item.Render(dc);
             }
             dc.Pop();
         }
 
-        var pixelW = (int)Math.Max(1, Math.Round(crop.Width * source.DpiX / 96.0));
-        var pixelH = (int)Math.Max(1, Math.Round(crop.Height * source.DpiY / 96.0));
+        int pixelW = (int)Math.Max(1, Math.Round(crop.Width * source.DpiX / 96.0));
+        int pixelH = (int)Math.Max(1, Math.Round(crop.Height * source.DpiY / 96.0));
         var rtb = new RenderTargetBitmap(pixelW, pixelH, source.DpiX, source.DpiY, PixelFormats.Pbgra32);
         rtb.Render(visual);
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using var stream = File.Create(destinationPath);
+        using FileStream stream = File.Create(destinationPath);
         encoder.Save(stream);
     }
 
@@ -308,7 +310,7 @@ public partial class PostSnipViewModel : ObservableObject
     [RelayCommand]
     private void New()
     {
-        var snipperPath = ResolveSnipperExecutablePath();
+        string? snipperPath = ResolveSnipperExecutablePath();
         if (string.IsNullOrWhiteSpace(snipperPath))
         {
             ErrorOccurred?.Invoke(this, "Flicksy.Snipper.exe was not found.");
@@ -335,8 +337,8 @@ public partial class PostSnipViewModel : ObservableObject
 
     private static string? ResolveSnipperExecutablePath()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
+        string baseDirectory = AppContext.BaseDirectory;
+        string[] candidates = new[]
         {
             Path.Combine(baseDirectory, "Flicksy.Snipper.exe"),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "Flicksy.Snipper", "bin", "Debug", "net10.0-windows", "Flicksy.Snipper.exe")),
@@ -354,7 +356,7 @@ public partial class PostSnipViewModel : ObservableObject
             return;
         }
 
-        var videoEditorPath = ResolveVideoEditorExecutablePath();
+        string? videoEditorPath = ResolveVideoEditorExecutablePath();
         if (string.IsNullOrWhiteSpace(videoEditorPath))
         {
             ErrorOccurred?.Invoke(this, "Flicksy.VideoEditor.exe was not found.");
@@ -386,8 +388,8 @@ public partial class PostSnipViewModel : ObservableObject
 
     private static string? ResolveVideoEditorExecutablePath()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
+        string baseDirectory = AppContext.BaseDirectory;
+        string[] candidates = new[]
         {
             Path.Combine(baseDirectory, "Flicksy.VideoEditor.exe"),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "Flicksy.VideoEditor", "bin", "Debug", "net10.0-windows", "Flicksy.VideoEditor.exe")),

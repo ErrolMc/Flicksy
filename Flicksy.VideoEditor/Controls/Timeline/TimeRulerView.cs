@@ -54,7 +54,8 @@ public sealed class TimeRulerView : FrameworkElement
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
-        if (_viewModel is null) return;
+        if (_viewModel is null) 
+            return;
         CaptureMouse();
         SeekFromMouse(e);
         e.Handled = true;
@@ -63,19 +64,22 @@ public sealed class TimeRulerView : FrameworkElement
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (!IsMouseCaptured || _viewModel is null) return;
+        if (!IsMouseCaptured || _viewModel is null) 
+            return;
         SeekFromMouse(e);
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
-        if (IsMouseCaptured) ReleaseMouseCapture();
+        if (IsMouseCaptured) 
+            ReleaseMouseCapture();
     }
 
     private void SeekFromMouse(MouseEventArgs e)
     {
-        if (_viewModel is null) return;
+        if (_viewModel is null) 
+            return;
         _viewModel.SeekToPixel(e.GetPosition(this).X);
     }
 
@@ -131,22 +135,25 @@ public sealed class TimeRulerView : FrameworkElement
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var width = MeasureContentWidth();
+        double width = MeasureContentWidth();
         return new Size(width, RulerHeight);
     }
 
     private double MeasureContentWidth()
     {
-        if (_viewModel is null) return MinContentWidth;
-        var totalFrames = Math.Max(_viewModel.Transport.TotalFrames, 1);
+        if (_viewModel is null) 
+            return MinContentWidth;
+
+        int totalFrames = Math.Max(_viewModel.Transport.TotalFrames, 1);
         return Math.Max(MinContentWidth, totalFrames * _viewModel.PixelsPerFrame);
     }
 
     protected override void OnRender(DrawingContext dc)
     {
-        var width = ActualWidth;
-        var height = ActualHeight;
-        if (width <= 0 || height <= 0) return;
+        double width = ActualWidth;
+        double height = ActualHeight;
+        if (width <= 0 || height <= 0) 
+            return;
 
         dc.DrawRectangle(BackgroundBrush, null, new Rect(0, 0, width, height));
 
@@ -156,38 +163,38 @@ public sealed class TimeRulerView : FrameworkElement
             return;
         }
 
-        var framerate = Math.Max(1, _viewModel.Project.Settings.Framerate);
-        var pxPerFrame = _viewModel.PixelsPerFrame;
-        var pxPerSecond = framerate * pxPerFrame;
+        int framerate = Math.Max(1, _viewModel.Project.Settings.Framerate);
+        double pxPerFrame = _viewModel.PixelsPerFrame;
+        double pxPerSecond = framerate * pxPerFrame;
         if (pxPerSecond <= 0)
         {
             DrawBottomBorder(dc, width, height);
             return;
         }
 
-        var stepSeconds = ChooseStepSeconds(pxPerSecond);
-        var pxPerStep = stepSeconds * pxPerSecond;
+        double stepSeconds = ChooseStepSeconds(pxPerSecond);
+        double pxPerStep = stepSeconds * pxPerSecond;
 
         // Minor ticks: 4 subdivisions per labeled step where they're visually distinct
         // (>=8px apart). Keeps the ruler legible even when zoomed in tight.
-        var minorPxPerTick = pxPerStep / 4.0;
+        double minorPxPerTick = pxPerStep / 4.0;
         if (minorPxPerTick >= 8)
         {
             for (double x = minorPxPerTick; x < width; x += minorPxPerTick)
             {
-                var px = SnapToPixel(x);
+                double px = SnapToPixel(x);
                 dc.DrawLine(MinorTickPen, new Point(px, height - 4), new Point(px, height));
             }
         }
 
-        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         for (double x = 0; x < width; x += pxPerStep)
         {
-            var px = SnapToPixel(x);
+            double px = SnapToPixel(x);
             dc.DrawLine(TickPen, new Point(px, height - 8), new Point(px, height));
 
-            var seconds = x / pxPerSecond;
-            var label = FormatTimecode(seconds);
+            double seconds = x / pxPerSecond;
+            string label = FormatTimecode(seconds);
             var ft = new FormattedText(
                 label,
                 CultureInfo.InvariantCulture,
@@ -204,7 +211,7 @@ public sealed class TimeRulerView : FrameworkElement
 
     private static void DrawBottomBorder(DrawingContext dc, double width, double height)
     {
-        var y = SnapToPixel(height - 0.5);
+        double y = SnapToPixel(height - 0.5);
         dc.DrawLine(BorderPen, new Point(0, y), new Point(width, y));
     }
 
@@ -212,19 +219,20 @@ public sealed class TimeRulerView : FrameworkElement
 
     private static double ChooseStepSeconds(double pxPerSecond)
     {
-        foreach (var s in StepSecondsCandidates)
+        foreach (double s in StepSecondsCandidates)
         {
-            if (s * pxPerSecond >= MinLabelSpacingPx) return s;
+            if (s * pxPerSecond >= MinLabelSpacingPx) 
+                return s;
         }
         return StepSecondsCandidates[^1];
     }
 
     private static string FormatTimecode(double seconds)
     {
-        var totalSeconds = (int)Math.Round(seconds);
-        var hours = totalSeconds / 3600;
-        var minutes = (totalSeconds / 60) % 60;
-        var secs = totalSeconds % 60;
+        int totalSeconds = (int)Math.Round(seconds);
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds / 60) % 60;
+        int secs = totalSeconds % 60;
         return hours > 0
             ? $"{hours:D1}:{minutes:D2}:{secs:D2}"
             : $"{minutes:D2}:{secs:D2}";
@@ -233,7 +241,8 @@ public sealed class TimeRulerView : FrameworkElement
     private static Pen MakeFrozenPen(Brush brush, double thickness)
     {
         var pen = new Pen(brush, thickness);
-        if (pen.CanFreeze) pen.Freeze();
+        if (pen.CanFreeze) 
+            pen.Freeze();
         return pen;
     }
 }

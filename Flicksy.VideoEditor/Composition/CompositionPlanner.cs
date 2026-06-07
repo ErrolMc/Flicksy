@@ -34,13 +34,16 @@ public static class CompositionPlanner
         int framerate = project.Settings.Framerate;
 
         int z = 0;
-        foreach (var track in OrderTracksForPlanning(project.Tracks))
+        foreach (Track track in OrderTracksForPlanning(project.Tracks))
         {
-            if (track.Disabled) continue;
+            if (track.Disabled) 
+                continue;
 
-            foreach (var clip in track.Clips)
+            foreach (Clip clip in track.Clips)
             {
-                if (!IsActiveAt(clip, frame)) continue;
+                if (!IsActiveAt(clip, frame)) 
+                    continue;
+
                 layers.Add(new CompositionLayer(clip, track, z++, ComputeSourceTime(clip, frame, framerate)));
             }
         }
@@ -68,7 +71,8 @@ public static class CompositionPlanner
     public static TimeSpan ComputeSourceTime(Clip clip, int frame, int framerate)
     {
         ArgumentNullException.ThrowIfNull(clip);
-        if (framerate <= 0) throw new ArgumentOutOfRangeException(nameof(framerate));
+        if (framerate <= 0) 
+            throw new ArgumentOutOfRangeException(nameof(framerate));
 
         if (clip is MediaClip mediaClip)
         {
@@ -88,10 +92,10 @@ public static class CompositionPlanner
     /// </summary>
     private static IEnumerable<Track> OrderTracksForPlanning(IEnumerable<Track> tracks)
     {
-        var list = tracks.ToList();
-        var video = list.Where(t => t.Kind == TrackKind.Video).Reverse();
-        var overlay = list.Where(t => t.Kind == TrackKind.Overlay).Reverse();
-        var audio = list.Where(t => t.Kind == TrackKind.Audio);
+        List<Track> list = tracks.ToList();
+        IEnumerable<Track> video = list.Where(t => t.Kind == TrackKind.Video).Reverse();
+        IEnumerable<Track> overlay = list.Where(t => t.Kind == TrackKind.Overlay).Reverse();
+        IEnumerable<Track> audio = list.Where(t => t.Kind == TrackKind.Audio);
         return video.Concat(overlay).Concat(audio);
     }
 }

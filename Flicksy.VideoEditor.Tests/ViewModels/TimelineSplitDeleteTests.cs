@@ -27,11 +27,11 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_Speed1_DividesSourceRangeAtPlayhead()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100), dur 90
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100), dur 90
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SplitClipAt(clip, frame: 40);                                                // 30 frames in → +1s source
 
         Assert.That(track.Clips.Count, Is.EqualTo(2));
@@ -53,11 +53,11 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_Speed2_SourceDivideScalesBySpeed()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 8, speed: 2);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 8, speed: 2);   // [10, 100)
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SplitClipAt(clip, frame: 40);                                                // 30 frames in → +2s source at 2x
 
         Assert.That(clip.SourceOut, Is.EqualTo(TimeSpan.FromSeconds(4)));
@@ -74,15 +74,15 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_RightHalfInheritsOriginalProperties()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 0, sourceOut: 6, speed: 2);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 0, sourceOut: 6, speed: 2);   // [10, 100)
         clip.Volume = 0.5;
         clip.Streams = ClipStreams.Video;
         clip.Name = "Intro";
         clip.Transform.RotationDegrees = 45;
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SplitClipAt(clip, frame: 40);
 
         var right = (MediaClip)track.Clips[1];
@@ -105,10 +105,10 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_PlayheadAtOrOutsideEdges_NoOp()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.SplitClipAt(clip, frame: 10);    // exactly the start
         vm.SplitClipAt(clip, frame: 100);   // exactly the end
@@ -123,10 +123,10 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_LockedTrack_NoOp()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project, locked: true);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project, locked: true);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.SplitClipAt(clip, frame: 40);
 
@@ -140,10 +140,10 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_UndoRedo_RoundTrips()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.SplitClipAt(clip, frame: 40);
         Assert.That(track.Clips.Count, Is.EqualTo(2));
@@ -165,12 +165,12 @@ public class TimelineSplitDeleteTests
     public void SplitSelectedAtPlayhead_SplitsEverySelectedMediaClipPlayheadCrosses()
     {
         var project = new ProjectModel();
-        var v1 = AddTrack(project);
-        var v2 = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var a = AddMediaClip(v1, source, start: 0, sourceIn: 0, sourceOut: 5);          // [0, 150)
-        var b = AddMediaClip(v2, source, start: 20, sourceIn: 0, sourceOut: 5);         // [20, 170)
-        var vm = MakeViewModel(project);
+        Track v1 = AddTrack(project);
+        Track v2 = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip a = AddMediaClip(v1, source, start: 0, sourceIn: 0, sourceOut: 5);          // [0, 150)
+        MediaClip b = AddMediaClip(v2, source, start: 20, sourceIn: 0, sourceOut: 5);         // [20, 170)
+        TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 60;                                                     // strictly inside both
         vm.SetSelection(new Clip[] { a, b });
 
@@ -189,12 +189,12 @@ public class TimelineSplitDeleteTests
     public void SplitSelectedAtPlayhead_SkipsNonMediaAndUncrossedClips()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project);
-        var overlay = AddTrack(project, TrackKind.Overlay);
-        var source = AddSource(project, durationSeconds: 20);
-        var media = AddMediaClip(video, source, start: 0, sourceIn: 0, sourceOut: 5);   // [0, 150)
-        var graphics = AddGraphicsClip(overlay, start: 0, duration: 150);              // GraphicsClip — split deferred to #13
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project);
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip media = AddMediaClip(video, source, start: 0, sourceIn: 0, sourceOut: 5);   // [0, 150)
+        GraphicsClip graphics = AddGraphicsClip(overlay, start: 0, duration: 150);              // GraphicsClip — split deferred to #13
+        TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 60;
         vm.SetSelection(new Clip[] { media, graphics });
 
@@ -243,13 +243,13 @@ public class TimelineSplitDeleteTests
     public void SplitClipAt_RightEdgeTransition_ReassignsAndUndoRestores()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var c = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);      // [10, 100)
-        var d = AddMediaClip(track, source, start: 100, sourceIn: 5, sourceOut: 8);     // right neighbour
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip c = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);      // [10, 100)
+        MediaClip d = AddMediaClip(track, source, start: 100, sourceIn: 5, sourceOut: 8);     // right neighbour
         track.Transitions.Add(new Transition { LeftClipId = c.Id, RightClipId = d.Id });
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SplitClipAt(c, frame: 40);
 
         var rightHalf = (MediaClip)track.Clips[1];                                       // C2 between C and D
@@ -276,7 +276,7 @@ public class TimelineSplitDeleteTests
         track.Transitions.Add(ab);
         track.Transitions.Add(cd);
 
-        var removed = track.RemoveTransitionsFor(b);
+        IReadOnlyList<Transition> removed = track.RemoveTransitionsFor(b);
 
         Assert.That(removed, Is.EquivalentTo(new[] { ab }));
         Assert.That(track.Transitions, Is.EquivalentTo(new[] { cd }));
@@ -288,10 +288,10 @@ public class TimelineSplitDeleteTests
     public void DeleteSelected_RemovesClip_AndUndoReinsertsAndSelects()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SelectedClip = clip;
 
         vm.DeleteSelectedCommand.Execute(null);
@@ -311,9 +311,9 @@ public class TimelineSplitDeleteTests
     public void DeleteSelected_GenericOnClipBase_DeletesGraphicsClip()
     {
         var project = new ProjectModel();
-        var overlay = AddTrack(project, TrackKind.Overlay);
-        var graphics = AddGraphicsClip(overlay, start: 0, duration: 60);
-        var vm = MakeViewModel(project);
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip graphics = AddGraphicsClip(overlay, start: 0, duration: 60);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SelectedClip = graphics;
 
         vm.DeleteSelectedCommand.Execute(null);
@@ -327,13 +327,13 @@ public class TimelineSplitDeleteTests
     public void DeleteSelected_RemovesParticipatingTransition_UndoRestores()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var a = AddMediaClip(track, source, start: 0, sourceIn: 0, sourceOut: 2);       // [0, 60)
-        var b = AddMediaClip(track, source, start: 60, sourceIn: 2, sourceOut: 4);      // [60, 120)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip a = AddMediaClip(track, source, start: 0, sourceIn: 0, sourceOut: 2);       // [0, 60)
+        MediaClip b = AddMediaClip(track, source, start: 60, sourceIn: 2, sourceOut: 4);      // [60, 120)
         var transition = new Transition { LeftClipId = a.Id, RightClipId = b.Id };
         track.Transitions.Add(transition);
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SelectedClip = a;
 
         vm.DeleteSelectedCommand.Execute(null);
@@ -349,10 +349,10 @@ public class TimelineSplitDeleteTests
     public void DeleteSelected_LockedTrackClip_Skipped()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project, locked: true);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project, locked: true);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SetSelection(new Clip[] { clip });
 
         vm.DeleteSelectedCommand.Execute(null);
@@ -367,11 +367,11 @@ public class TimelineSplitDeleteTests
     public void MultiDelete_CompositeUndoRedo_RestoresAllClips()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var a = AddMediaClip(track, source, start: 0, sourceIn: 0, sourceOut: 2);       // [0, 60)
-        var b = AddMediaClip(track, source, start: 100, sourceIn: 0, sourceOut: 2);     // [100, 160)
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip a = AddMediaClip(track, source, start: 0, sourceIn: 0, sourceOut: 2);       // [0, 60)
+        MediaClip b = AddMediaClip(track, source, start: 100, sourceIn: 0, sourceOut: 2);     // [100, 160)
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SetSelection(new Clip[] { a, b });
 
         vm.DeleteSelectedCommand.Execute(null);

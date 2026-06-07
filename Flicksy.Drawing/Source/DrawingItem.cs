@@ -30,21 +30,21 @@ public abstract class DrawingItem : ObservableObject
 
     public void TranslateFrom(Matrix baseTransform, Vector totalDelta)
     {
-        var m = baseTransform;
+        Matrix m = baseTransform;
         m.Translate(totalDelta.X, totalDelta.Y);
         Transform.Matrix = m;
     }
 
     public void ScaleFrom(Matrix baseTransform, double factor, Point anchorWorld)
     {
-        var m = baseTransform;
+        Matrix m = baseTransform;
         m.ScaleAt(factor, factor, anchorWorld.X, anchorWorld.Y);
         Transform.Matrix = m;
     }
 
     public void RotateFrom(Matrix baseTransform, double angleDegrees, Point centerWorld)
     {
-        var m = baseTransform;
+        Matrix m = baseTransform;
         m.RotateAt(angleDegrees, centerWorld.X, centerWorld.Y);
         Transform.Matrix = m;
     }

@@ -18,33 +18,33 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_FirstLane_ResolvesFirstTrack()
     {
-        var tracks = Tracks(TrackKind.Video, TrackKind.Audio);
-        var hit = Hit(x: 0, y: 10, tracks);
+        List<Track> tracks = Tracks(TrackKind.Video, TrackKind.Audio);
+        TimelineHit hit = Hit(x: 0, y: 10, tracks);
         Assert.That(hit.Track, Is.SameAs(tracks[0]));
     }
 
     [Test]
     public void HitTest_SecondLane_ResolvesSecondTrack()
     {
-        var tracks = Tracks(TrackKind.Video, TrackKind.Audio);
+        List<Track> tracks = Tracks(TrackKind.Video, TrackKind.Audio);
         // y in [56, 112) is the second lane.
-        var hit = Hit(x: 0, y: TrackHeight + 1, tracks);
+        TimelineHit hit = Hit(x: 0, y: TrackHeight + 1, tracks);
         Assert.That(hit.Track, Is.SameAs(tracks[1]));
     }
 
     [Test]
     public void HitTest_NegativeY_IsMiss()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         Assert.That(Hit(x: 0, y: -1, tracks), Is.EqualTo(TimelineHit.Miss));
     }
 
     [Test]
     public void HitTest_PastLastLane_IsMiss()
     {
-        var tracks = Tracks(TrackKind.Video, TrackKind.Audio);
+        List<Track> tracks = Tracks(TrackKind.Video, TrackKind.Audio);
         // Two lanes occupy [0, 112); y beyond that is empty space below the stack.
-        var hit = Hit(x: 0, y: TrackHeight * 2 + 5, tracks);
+        TimelineHit hit = Hit(x: 0, y: TrackHeight * 2 + 5, tracks);
         Assert.That(hit, Is.EqualTo(TimelineHit.Miss));
     }
 
@@ -53,7 +53,7 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_FrameIsRoundedFromX()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         // x = 5px at 6px/frame ≈ 0.83 → rounds to frame 1.
         Assert.That(Hit(x: 5, y: 10, tracks).Frame, Is.EqualTo(1));
         // x = 60px → frame 10 exactly.
@@ -65,10 +65,10 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_OverClipBody_ReturnsBody()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 2)); // [10, 70)
         // Frame 40 (x = 240px) is mid-clip, well away from either edge band.
-        var hit = Hit(x: 40 * Ppf, y: 10, tracks);
+        TimelineHit hit = Hit(x: 40 * Ppf, y: 10, tracks);
         Assert.That(hit.Zone, Is.EqualTo(HitZone.Body));
         Assert.That(hit.Clip, Is.SameAs(tracks[0].Clips[0]));
     }
@@ -76,10 +76,10 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_EmptyLaneSpace_ReturnsNoneAndNoClip()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 2)); // [10, 70)
         // Frame 5 (x = 30px) is before the clip — empty space.
-        var hit = Hit(x: 5 * Ppf, y: 10, tracks);
+        TimelineHit hit = Hit(x: 5 * Ppf, y: 10, tracks);
         Assert.That(hit.Zone, Is.EqualTo(HitZone.None));
         Assert.That(hit.Clip, Is.Null);
         Assert.That(hit.Track, Is.SameAs(tracks[0]));
@@ -88,10 +88,10 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_PastClipEnd_IsHalfOpen()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Clips.Add(MediaClip(timelineStart: 0, sourceSeconds: 1)); // [0, 30)
         // Frame 30 is the first frame past the clip (half-open) → empty.
-        var hit = Hit(x: 30 * Ppf, y: 10, tracks);
+        TimelineHit hit = Hit(x: 30 * Ppf, y: 10, tracks);
         Assert.That(hit.Clip, Is.Null);
     }
 
@@ -100,32 +100,32 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_NearLeftEdge_ReturnsLeftEdge()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 2)); // left px = 60
         // 2px right of the left edge → within the 5px band.
-        var hit = Hit(x: 60 + 2, y: 10, tracks);
+        TimelineHit hit = Hit(x: 60 + 2, y: 10, tracks);
         Assert.That(hit.Zone, Is.EqualTo(HitZone.LeftEdge));
     }
 
     [Test]
     public void HitTest_NearRightEdge_ReturnsRightEdge()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 2)); // right px = 70*6 = 420
-        var hit = Hit(x: 420 - 2, y: 10, tracks);
+        TimelineHit hit = Hit(x: 420 - 2, y: 10, tracks);
         Assert.That(hit.Zone, Is.EqualTo(HitZone.RightEdge));
     }
 
     [Test]
     public void HitTest_TinyClip_EdgeBandClampedToHalfWidth_LeavesBodyGrabbable()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         // A 1-frame clip at 6px/frame is 6px wide. Band clamps to 3px each side, so the
         // exact center (x = leftPx + 3) is neither edge — it must resolve to Body so a
         // narrow clip can still be grabbed for Move.
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 1.0 / Framerate)); // 1 frame
-        var leftPx = 10 * Ppf;
-        var hit = Hit(x: leftPx + 3, y: 10, tracks);
+        double leftPx = 10 * Ppf;
+        TimelineHit hit = Hit(x: leftPx + 3, y: 10, tracks);
         Assert.That(hit.Zone, Is.EqualTo(HitZone.Body));
     }
 
@@ -134,10 +134,10 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_LockedTrack_ReportsTrackAndFrameButNoClip()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         tracks[0].Locked = true;
         tracks[0].Clips.Add(MediaClip(timelineStart: 10, sourceSeconds: 2));
-        var hit = Hit(x: 40 * Ppf, y: 10, tracks);
+        TimelineHit hit = Hit(x: 40 * Ppf, y: 10, tracks);
         Assert.That(hit.Track, Is.SameAs(tracks[0]), "track still resolves (scrub/clear-select works)");
         Assert.That(hit.Clip, Is.Null, "no clip reported on a locked track");
         Assert.That(hit.Zone, Is.EqualTo(HitZone.None));
@@ -149,7 +149,7 @@ public class TimelineHitTesterTests
     [Test]
     public void HitTest_NonPositivePixelsPerFrame_IsMiss()
     {
-        var tracks = Tracks(TrackKind.Video);
+        List<Track> tracks = Tracks(TrackKind.Video);
         Assert.That(TimelineHitTester.HitTest(10, 10, tracks, 0, TrackHeight), Is.EqualTo(TimelineHit.Miss));
     }
 
@@ -166,46 +166,46 @@ public class TimelineHitTesterTests
     [Test]
     public void ClipsIntersecting_BandSpanningBothLanes_SelectsClipsOnBoth()
     {
-        var (tracks, a, b) = TwoTrackLayout();
+        (List<Track> tracks, Clip a, Clip b) = TwoTrackLayout();
         // X [0, 700) covers A's start and reaches into B; Y [10, 70) straddles both lanes.
-        var hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { a, b }));
     }
 
     [Test]
     public void ClipsIntersecting_BandInFirstLaneOnly_SelectsOnlyFirstTrackClip()
     {
-        var (tracks, a, _) = TwoTrackLayout();
+        (List<Track> tracks, Clip a, _) = TwoTrackLayout();
         // Y [10, 50) stays inside lane 0, so B on lane 1 is excluded even though X reaches it.
-        var hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { a }));
     }
 
     [Test]
     public void ClipsIntersecting_BandLeftOfEveryClip_SelectsNothing()
     {
-        var (tracks, _, _) = TwoTrackLayout();
+        (List<Track> tracks, _, _) = TwoTrackLayout();
         // X [0, 50) ends before A's left px (60); nothing overlaps horizontally.
-        var hits = Intersect(left: 0, top: 0, width: 50, height: 112, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 0, width: 50, height: 112, tracks);
         Assert.That(hits, Is.Empty);
     }
 
     [Test]
     public void ClipsIntersecting_PartialHorizontalOverlap_Selects()
     {
-        var (tracks, a, _) = TwoTrackLayout();
+        (List<Track> tracks, Clip a, _) = TwoTrackLayout();
         // Band covers only A's first few pixels [55, 90) — partial overlap still selects.
-        var hits = Intersect(left: 55, top: 10, width: 35, height: 30, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 55, top: 10, width: 35, height: 30, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { a }));
     }
 
     [Test]
     public void ClipsIntersecting_HalfOpenAtClipStart_Excludes()
     {
-        var (tracks, _, _) = TwoTrackLayout();
+        (List<Track> tracks, _, _) = TwoTrackLayout();
         // Band right edge exactly at A's left px (60): [leftPx, rightPx) is half-open, so a band
         // ending at the start pixel doesn't grab it (consistent with HitTest's pixel model).
-        var hits = Intersect(left: 0, top: 10, width: 60, height: 30, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 60, height: 30, tracks);
         Assert.That(hits, Is.Empty);
         // One pixel further and it's inside.
         Assert.That(Intersect(left: 0, top: 10, width: 61, height: 30, tracks), Has.Count.EqualTo(1));
@@ -214,49 +214,49 @@ public class TimelineHitTesterTests
     [Test]
     public void ClipsIntersecting_HalfOpenAtClipEnd_Excludes()
     {
-        var (tracks, _, _) = TwoTrackLayout();
+        (List<Track> tracks, _, _) = TwoTrackLayout();
         // Band left edge exactly at A's right px (420): a band starting at the end pixel misses it.
-        var hits = Intersect(left: 420, top: 10, width: 100, height: 30, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 420, top: 10, width: 100, height: 30, tracks);
         Assert.That(hits, Is.Empty);
     }
 
     [Test]
     public void ClipsIntersecting_LockedTrack_IsSkipped()
     {
-        var (tracks, _, b) = TwoTrackLayout();
+        (List<Track> tracks, _, Clip b) = TwoTrackLayout();
         tracks[0].Locked = true;   // lane 0 (clip A) is inert
         // A band covering both lanes now returns only B — A's locked lane is skipped.
-        var hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 700, height: 60, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { b }));
     }
 
     [Test]
     public void ClipsIntersecting_DisabledTrack_IsStillSelectable()
     {
-        var (tracks, a, _) = TwoTrackLayout();
+        (List<Track> tracks, Clip a, _) = TwoTrackLayout();
         tracks[0].Disabled = true;   // Disabled is compositor-skip only — still editable / selectable
-        var hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 700, height: 40, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { a }));
     }
 
     [Test]
     public void ClipsIntersecting_OrdersTrackMajorThenLeftToRight()
     {
-        var tracks = Tracks(TrackKind.Video);
-        var right = MediaClip(timelineStart: 100, sourceSeconds: 1);   // px [600, 780)
-        var left = MediaClip(timelineStart: 10, sourceSeconds: 1);     // px [60, 240)
+        List<Track> tracks = Tracks(TrackKind.Video);
+        MediaClip right = MediaClip(timelineStart: 100, sourceSeconds: 1);   // px [600, 780)
+        MediaClip left = MediaClip(timelineStart: 10, sourceSeconds: 1);     // px [60, 240)
         tracks[0].Clips.Add(right);                                    // added out of order
         tracks[0].Clips.Add(left);
         // Within a track the result follows Clips order; this asserts the method preserves it
         // (the primary picker downstream takes result[0]).
-        var hits = Intersect(left: 0, top: 10, width: 800, height: 40, tracks);
+        IReadOnlyList<Clip> hits = Intersect(left: 0, top: 10, width: 800, height: 40, tracks);
         Assert.That(hits, Is.EqualTo(new Clip[] { right, left }));
     }
 
     [Test]
     public void ClipsIntersecting_ZeroAreaRect_SelectsNothing()
     {
-        var (tracks, _, _) = TwoTrackLayout();
+        (List<Track> tracks, _, _) = TwoTrackLayout();
         Assert.That(Intersect(left: 100, top: 10, width: 0, height: 30, tracks), Is.Empty);
         Assert.That(Intersect(left: 100, top: 10, width: 30, height: 0, tracks), Is.Empty);
     }
@@ -264,7 +264,7 @@ public class TimelineHitTesterTests
     [Test]
     public void ClipsIntersecting_NonPositivePixelsPerFrame_IsEmpty()
     {
-        var (tracks, _, _) = TwoTrackLayout();
+        (List<Track> tracks, _, _) = TwoTrackLayout();
         Assert.That(
             TimelineHitTester.ClipsIntersecting(0, 0, 700, 112, tracks, 0, TrackHeight),
             Is.Empty);
@@ -289,9 +289,9 @@ public class TimelineHitTesterTests
     // Clip A on lane 0 (Video) spans px [60, 420); clip B on lane 1 (Audio) spans px [600, 780).
     private static (List<Track> Tracks, Clip A, Clip B) TwoTrackLayout()
     {
-        var tracks = Tracks(TrackKind.Video, TrackKind.Audio);
-        var a = MediaClip(timelineStart: 10, sourceSeconds: 2);    // [10, 70) frames → px [60, 420)
-        var b = MediaClip(timelineStart: 100, sourceSeconds: 1);   // [100, 130) frames → px [600, 780)
+        List<Track> tracks = Tracks(TrackKind.Video, TrackKind.Audio);
+        MediaClip a = MediaClip(timelineStart: 10, sourceSeconds: 2);    // [10, 70) frames → px [60, 420)
+        MediaClip b = MediaClip(timelineStart: 100, sourceSeconds: 1);   // [100, 130) frames → px [600, 780)
         tracks[0].Clips.Add(a);
         tracks[1].Clips.Add(b);
         return (tracks, a, b);
@@ -300,7 +300,7 @@ public class TimelineHitTesterTests
     private static List<Track> Tracks(params TrackKind[] kinds)
     {
         var list = new List<Track>();
-        foreach (var kind in kinds)
+        foreach (TrackKind kind in kinds)
         {
             list.Add(new Track { Kind = kind });
         }

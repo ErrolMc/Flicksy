@@ -27,12 +27,12 @@ public class TimelineTrimTests
     public void ResolveTrim_RightEdge_Speed1_ShiftsSourceOutAndHoldsStart()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 130);       // +30 frames
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 130);       // +30 frames
 
         Assert.That(r.TimelineStart, Is.EqualTo(10));                                    // left edge held
         Assert.That(r.SourceIn, Is.EqualTo(TimeSpan.FromSeconds(2)));                    // in-point held
@@ -45,12 +45,12 @@ public class TimelineTrimTests
     public void ResolveTrim_RightEdge_Speed2_SourceDeltaScalesBySpeed()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 8, speed: 2);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 8, speed: 2);   // [10, 100)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 130);       // +30 frames
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 130);       // +30 frames
 
         // At 2x, 30 timeline frames consume 2s of source (vs 1s at 1x).
         Assert.That(r.SourceOut, Is.EqualTo(TimeSpan.FromSeconds(10)));
@@ -64,12 +64,12 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_Speed1_SlidesStartAndSourceInHoldsEnd()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 8);   // [10, 160)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 8);   // [10, 160)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);         // +30 frames (shrink)
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);         // +30 frames (shrink)
 
         Assert.That(r.TimelineStart, Is.EqualTo(40));
         Assert.That(r.SourceIn, Is.EqualTo(TimeSpan.FromSeconds(4)));                    // 3 + 30/30s
@@ -82,12 +82,12 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_Speed2_SourceDeltaScalesBySpeed()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 9, speed: 2);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 9, speed: 2);   // [10, 100)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);         // +30 frames
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);         // +30 frames
 
         Assert.That(r.TimelineStart, Is.EqualTo(40));
         Assert.That(r.SourceIn, Is.EqualTo(TimeSpan.FromSeconds(5)));                    // 3 + 30*2/30s
@@ -101,12 +101,12 @@ public class TimelineTrimTests
     public void ResolveTrim_RightEdge_ClampsToSourceDuration()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 18);  // [10, 490)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 18);  // [10, 490)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 600);       // way past the source
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 600);       // way past the source
 
         Assert.That(r.SourceOut, Is.EqualTo(TimeSpan.FromSeconds(20)));                  // pinned at source end
         Apply(clip, r);
@@ -117,12 +117,12 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_ClampsToSourceStart()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 100);
-        var clip = AddMediaClip(track, source, start: 100, sourceIn: 1, sourceOut: 8);  // [100, 310)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 100);
+        MediaClip clip = AddMediaClip(track, source, start: 100, sourceIn: 1, sourceOut: 8);  // [100, 310)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 50);         // extend left past source 0
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 50);         // extend left past source 0
 
         Assert.That(r.SourceIn, Is.EqualTo(TimeSpan.Zero));                             // SourceIn floored at 0
         Assert.That(r.TimelineStart, Is.EqualTo(70));                                   // 100 - 30 frames of headroom
@@ -136,12 +136,12 @@ public class TimelineTrimTests
     public void ResolveTrim_RightEdge_FloorsAtOneFrame()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 3);         // drag the end past the start
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 3);         // drag the end past the start
 
         Apply(clip, r);
         Assert.That(clip.Duration, Is.EqualTo(1));
@@ -152,12 +152,12 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_FloorsAtOneFrame()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 200);        // drag the start past the end
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 200);        // drag the start past the end
 
         Apply(clip, r);
         Assert.That(clip.Duration, Is.EqualTo(1));
@@ -171,13 +171,13 @@ public class TimelineTrimTests
     public void ResolveTrim_RightEdge_ClampsToNextNeighbour()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 100);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 100);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
         AddMediaClip(track, source, start: 150, sourceIn: 2, sourceOut: 5);            // right neighbour at 150
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 300);       // try to extend past it
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 300);       // try to extend past it
 
         Apply(clip, r);
         Assert.That(clip.TimelineStart + clip.Duration, Is.EqualTo(150));              // pinned at the neighbour edge
@@ -187,13 +187,13 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_ClampsToPrevNeighbour()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 100);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 100);
         AddMediaClip(track, source, start: 0, sourceIn: 0, sourceOut: 2);              // prev neighbour [0, 60)
-        var clip = AddMediaClip(track, source, start: 100, sourceIn: 2, sourceOut: 5); // [100, 190)
+        MediaClip clip = AddMediaClip(track, source, start: 100, sourceIn: 2, sourceOut: 5); // [100, 190)
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 10);         // try to extend before it
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 10);         // try to extend before it
 
         Assert.That(r.TimelineStart, Is.EqualTo(60));                                   // pinned at the neighbour edge
         Apply(clip, r);
@@ -206,19 +206,19 @@ public class TimelineTrimTests
     public void ResolveTrim_BrokenClip_RightEdge_ExtendRefused_ShrinkAllowed()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20, missing: true);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20, missing: true);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 2, sourceOut: 5);   // [10, 100)
         Assert.That(clip.IsBroken, Is.True);
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
 
         // Extend refused: a missing-source clip can't grow past its current edge.
-        var extend = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 200);
+        TrimResult extend = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 200);
         Assert.That(extend, Is.EqualTo(TrimResult.Capture(clip)));
 
         // Shrink allowed.
-        var shrink = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 70);
+        TrimResult shrink = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 70);
         Apply(clip, shrink);
         Assert.That(clip.Duration, Is.EqualTo(60));
     }
@@ -227,16 +227,16 @@ public class TimelineTrimTests
     public void ResolveTrim_BrokenClip_LeftEdge_ExtendRefused_ShrinkAllowed()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20, missing: true);
-        var clip = AddMediaClip(track, source, start: 50, sourceIn: 2, sourceOut: 5);   // [50, 140)
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20, missing: true);
+        MediaClip clip = AddMediaClip(track, source, start: 50, sourceIn: 2, sourceOut: 5);   // [50, 140)
 
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
 
-        var extend = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 10);
+        TrimResult extend = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 10);
         Assert.That(extend, Is.EqualTo(TrimResult.Capture(clip)));
 
-        var shrink = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 80);
+        TrimResult shrink = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 80);
         Apply(clip, shrink);
         Assert.That(clip.TimelineStart, Is.EqualTo(80));
         Assert.That(clip.TimelineStart + clip.Duration, Is.EqualTo(140));             // right edge held
@@ -248,12 +248,12 @@ public class TimelineTrimTests
     public void ResolveTrim_LeftEdge_FloorsAtFrameZero()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 100);
-        var clip = AddMediaClip(track, source, start: 20, sourceIn: 10, sourceOut: 15); // source has ample headroom
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 100);
+        MediaClip clip = AddMediaClip(track, source, start: 20, sourceIn: 10, sourceOut: 15); // source has ample headroom
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: -50);        // drag off the left end
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: -50);        // drag off the left end
 
         Assert.That(r.TimelineStart, Is.EqualTo(0));                                    // frame-0 binds before source
     }
@@ -264,12 +264,12 @@ public class TimelineTrimTests
     public void ResolveTrim_ZeroLengthClip_NoOp()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 5, sourceOut: 5);   // Duration 0
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 5, sourceOut: 5);   // Duration 0
 
-        var vm = MakeViewModel(project);
-        var r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 50);
+        TimelineViewModel vm = MakeViewModel(project);
+        TrimResult r = vm.ResolveTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 50);
 
         Assert.That(r, Is.EqualTo(TrimResult.Capture(clip)));
     }
@@ -280,13 +280,13 @@ public class TimelineTrimTests
     public void TrimClipCommand_UndoRedo_RestoresStateAndSelectsClip()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 8);   // [10, 160)
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = AddMediaClip(track, source, start: 10, sourceIn: 3, sourceOut: 8);   // [10, 160)
+        TimelineViewModel vm = MakeViewModel(project);
 
-        var before = TrimResult.Capture(clip);
-        var after = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);
+        TrimResult before = TrimResult.Capture(clip);
+        TrimResult after = vm.ResolveTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);
         Apply(clip, after);                                                             // the gesture mutates live
         vm.History.Push(new TrimClipCommand(vm, clip, before, after));
 

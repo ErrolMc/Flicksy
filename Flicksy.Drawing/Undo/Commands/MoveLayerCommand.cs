@@ -20,7 +20,7 @@ public sealed class MoveLayerCommand : IUndoableCommand
 
     public void Redo()
     {
-        var currentIndex = _viewModel.Items.IndexOf(_item);
+        int currentIndex = _viewModel.Items.IndexOf(_item);
         if (currentIndex < 0 || currentIndex == _newIndex)
         {
             return;
@@ -31,7 +31,7 @@ public sealed class MoveLayerCommand : IUndoableCommand
 
     public void Undo()
     {
-        var currentIndex = _viewModel.Items.IndexOf(_item);
+        int currentIndex = _viewModel.Items.IndexOf(_item);
         if (currentIndex < 0 || currentIndex == _oldIndex)
         {
             return;

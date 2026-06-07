@@ -23,8 +23,9 @@ public partial class WelcomeWindow : Window
     {
         base.OnSourceInitialized(e);
 
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero) return;
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) 
+            return;
 
         int useDark = 1;
         if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)

@@ -99,17 +99,23 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     public void TogglePlayPause()
     {
-        if (_transport.IsPlaying) Pause();
-        else Play();
+        if (_transport.IsPlaying) 
+            Pause();
+        else 
+            Play();
     }
 
     public void Play()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
 
         int total = _transport.TotalFrames;
-        if (total <= 0) return;          // nothing to play
-        if (_project.Settings.Framerate <= 0) return;
+        if (total <= 0) 
+            return;          // nothing to play
+
+        if (_project.Settings.Framerate <= 0) 
+            return;
 
         // Play-from-end restarts at frame 0 (mirrors FFmpegVideoPlayer).
         if (_transport.Playhead >= total - 1)
@@ -144,7 +150,8 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     public void Pause()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
 
         _clock.Stop();
         _priming = false;
@@ -153,7 +160,14 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
         _frameSink.PlaybackFrames = null; // preview reverts to synchronous decode (scrub)
         _videoPump.Stop();
         _prefetchFrame = -1; // buffer drained by Stop
-        try { _output?.Pause(); } catch { /* device may be gone */ }
+        try 
+        { 
+            _output?.Pause(); 
+        } 
+        catch 
+        { 
+            // device may be gone
+        }
         _transport.IsPlaying = false;
 
         // Re-warm the prefetch at the pause position (debounced) so a subsequent Play reuses a full
@@ -164,14 +178,18 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     public void StepFrame(int delta)
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
 
         Pause();
 
         int total = _transport.TotalFrames;
         int target = _transport.Playhead + delta;
-        if (target < 0) target = 0;
-        if (total > 0 && target > total) target = total;
+        if (target < 0) 
+            target = 0;
+
+        if (total > 0 && target > total) 
+            target = total;
 
         // External (non-suppressed) write → OnTransportPropertyChanged re-baselines the clock
         // and seeks audio; the preview repaints off the same Playhead change.
@@ -180,8 +198,11 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     private void OnTransportPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(TransportViewModel.Playhead)) return;
-        if (_suppressPlayheadHandler) return;
+        if (e.PropertyName != nameof(TransportViewModel.Playhead)) 
+            return;
+
+        if (_suppressPlayheadHandler) 
+            return;
 
         // External playhead change — scrub, ruler/timeline click, or a programmatic seek. A manual
         // seek is a take-over, so stop playback if it was running; the user resumes with Play. (The
@@ -205,7 +226,9 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
     /// <summary>(Re)start the debounce window; on expiry <see cref="OnPrefetchTick"/> warms the pump.</summary>
     private void SchedulePrefetch()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _prefetchTimer.Stop();
         _prefetchTimer.Start();
     }
@@ -213,14 +236,18 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
     private void OnPrefetchTick(object? sender, EventArgs e)
     {
         _prefetchTimer.Stop();
-        if (_disposed || _transport.IsPlaying) return;
-        if (_transport.TotalFrames <= 0 || _project.Settings.Framerate <= 0) return;
+        if (_disposed || _transport.IsPlaying) 
+            return;
+
+        if (_transport.TotalFrames <= 0 || _project.Settings.Framerate <= 0)
+            return;
 
         // Playhead has settled while paused: warm the pump (decoder + buffer) here at the preview's
         // scale so the next Play starts instantly. No-op if it's already primed at this spot.
         int frame = _transport.Playhead;
         double scale = _frameSink.CurrentDecodeScale;
-        if (_videoPump.IsRunning && _prefetchFrame == frame && _prefetchScale == scale) return;
+        if (_videoPump.IsRunning && _prefetchFrame == frame && _prefetchScale == scale) 
+            return;
 
         _videoPump.Prefetch(frame, scale);
         _prefetchFrame = frame;
@@ -229,7 +256,8 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (_disposed || !_transport.IsPlaying) return;
+        if (_disposed || !_transport.IsPlaying) 
+            return;
 
         int framerate = _project.Settings.Framerate;
         int total = _transport.TotalFrames;
@@ -290,14 +318,18 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     private void HookRendering()
     {
-        if (_renderingHooked) return;
+        if (_renderingHooked) 
+            return;
+
         CompositionTarget.Rendering += OnRendering;
         _renderingHooked = true;
     }
 
     private void UnhookRendering()
     {
-        if (!_renderingHooked) return;
+        if (!_renderingHooked) 
+            return;
+
         CompositionTarget.Rendering -= OnRendering;
         _renderingHooked = false;
     }
@@ -306,8 +338,14 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     private void TryStartOutput()
     {
-        try { _output?.Play(); }
-        catch (Exception ex) { Debug.WriteLine($"PlaybackEngine: audio output failed to start: {ex.Message}"); }
+        try 
+        {
+            _output?.Play(); 
+        }
+        catch (Exception ex) 
+        { 
+            Debug.WriteLine($"PlaybackEngine: audio output failed to start: {ex.Message}"); 
+        }
     }
 
     /// <summary>
@@ -343,8 +381,10 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            if (!enumerator.HasDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)) return 0;
-            using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            if (!enumerator.HasDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)) 
+                return 0;
+
+            using MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             return device.AudioClient.MixFormat.SampleRate;
         }
         catch
@@ -355,7 +395,9 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
 
         _transport.PropertyChanged -= OnTransportPropertyChanged;
@@ -367,8 +409,24 @@ public sealed class PlaybackEngine : IPlaybackController, IDisposable
         _frameSink.PlaybackFrames = null;
         _videoPump.Dispose(); // joins the producer thread before its decoder cache is torn down
 
-        try { _output?.Stop(); } catch { /* ignore */ }
-        try { _output?.Dispose(); } catch { /* ignore */ }
+        try 
+        { 
+            _output?.Stop(); 
+        } 
+        catch 
+        { 
+            // ignore
+        }
+
+        try 
+        { 
+            _output?.Dispose(); 
+        } 
+        catch 
+        { 
+            // ignore
+        }
+
         _output = null;
 
         _mixer.Dispose();

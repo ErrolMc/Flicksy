@@ -106,7 +106,7 @@ public partial class TransportViewModel : ObservableObject
     private void SubscribeProjectMutations()
     {
         _project.Tracks.CollectionChanged += OnTracksCollectionChanged;
-        foreach (var track in _project.Tracks)
+        foreach (Track track in _project.Tracks)
         {
             SubscribeTrack(track);
         }
@@ -115,7 +115,7 @@ public partial class TransportViewModel : ObservableObject
     private void SubscribeTrack(Track track)
     {
         track.Clips.CollectionChanged += OnTrackClipsChanged;
-        foreach (var clip in track.Clips)
+        foreach (Clip clip in track.Clips)
         {
             clip.PropertyChanged += OnClipPropertyChanged;
         }
@@ -124,7 +124,7 @@ public partial class TransportViewModel : ObservableObject
     private void UnsubscribeTrack(Track track)
     {
         track.Clips.CollectionChanged -= OnTrackClipsChanged;
-        foreach (var clip in track.Clips)
+        foreach (Clip clip in track.Clips)
         {
             clip.PropertyChanged -= OnClipPropertyChanged;
         }
@@ -134,11 +134,13 @@ public partial class TransportViewModel : ObservableObject
     {
         if (e.OldItems is not null)
         {
-            foreach (Track t in e.OldItems) UnsubscribeTrack(t);
+            foreach (Track t in e.OldItems) 
+                UnsubscribeTrack(t);
         }
         if (e.NewItems is not null)
         {
-            foreach (Track t in e.NewItems) SubscribeTrack(t);
+            foreach (Track t in e.NewItems) 
+                SubscribeTrack(t);
         }
         TotalFrames = ComputeTotalFrames(_project);
     }
@@ -147,11 +149,13 @@ public partial class TransportViewModel : ObservableObject
     {
         if (e.OldItems is not null)
         {
-            foreach (Clip c in e.OldItems) c.PropertyChanged -= OnClipPropertyChanged;
+            foreach (Clip c in e.OldItems) 
+                c.PropertyChanged -= OnClipPropertyChanged;
         }
         if (e.NewItems is not null)
         {
-            foreach (Clip c in e.NewItems) c.PropertyChanged += OnClipPropertyChanged;
+            foreach (Clip c in e.NewItems) 
+                c.PropertyChanged += OnClipPropertyChanged;
         }
         TotalFrames = ComputeTotalFrames(_project);
     }
@@ -167,12 +171,13 @@ public partial class TransportViewModel : ObservableObject
     private static int ComputeTotalFrames(Project.Project project)
     {
         int max = 0;
-        foreach (var track in project.Tracks)
+        foreach (Track track in project.Tracks)
         {
-            foreach (var clip in track.Clips)
+            foreach (Clip clip in track.Clips)
             {
-                var end = clip.TimelineStart + clip.Duration;
-                if (end > max) max = end;
+                int end = clip.TimelineStart + clip.Duration;
+                if (end > max) 
+                    max = end;
             }
         }
         return max;
@@ -181,12 +186,15 @@ public partial class TransportViewModel : ObservableObject
     // hh:mm:ss.ff where ff is the frame index inside the current second.
     private static string FormatTimecode(int frames, int framerate)
     {
-        if (framerate <= 0) framerate = 1;
-        var totalSeconds = frames / framerate;
-        var frame = frames % framerate;
-        var hours = totalSeconds / 3600;
-        var minutes = (totalSeconds / 60) % 60;
-        var seconds = totalSeconds % 60;
+        if (framerate <= 0) 
+            framerate = 1;
+
+        int totalSeconds = frames / framerate;
+        int frame = frames % framerate;
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds / 60) % 60;
+        int seconds = totalSeconds % 60;
+
         return $"{hours:D2}:{minutes:D2}:{seconds:D2}.{frame:D2}";
     }
 }

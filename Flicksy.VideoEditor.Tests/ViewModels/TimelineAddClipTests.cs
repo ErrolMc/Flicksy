@@ -22,10 +22,10 @@ public class TimelineAddClipTests
     public void AddClip_InsertsSelectsAndPushesUndo()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = MakeMediaClip(source, start: 30);
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = MakeMediaClip(source, start: 30);
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.AddClip(track, clip);
 
@@ -38,10 +38,10 @@ public class TimelineAddClipTests
     public void AddClip_Undo_RemovesAndDeselects_Redo_Reinstates()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var clip = MakeMediaClip(source, start: 30);
-        var vm = MakeViewModel(project);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip clip = MakeMediaClip(source, start: 30);
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.AddClip(track, clip);
 
@@ -58,15 +58,15 @@ public class TimelineAddClipTests
     public void AddClip_InsertsInTimelineStartOrder()
     {
         var project = new ProjectModel();
-        var track = AddTrack(project);
-        var source = AddSource(project, durationSeconds: 20);
-        var first = MakeMediaClip(source, start: 0);
-        var third = MakeMediaClip(source, start: 200);
+        Track track = AddTrack(project);
+        MediaSource source = AddSource(project, durationSeconds: 20);
+        MediaClip first = MakeMediaClip(source, start: 0);
+        MediaClip third = MakeMediaClip(source, start: 200);
         track.Clips.Add(first);
         track.Clips.Add(third);
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
 
-        var middle = MakeMediaClip(source, start: 100);
+        MediaClip middle = MakeMediaClip(source, start: 100);
         vm.AddClip(track, middle);
 
         Assert.That(track.Clips, Is.EqualTo(new Clip[] { first, middle, third }));

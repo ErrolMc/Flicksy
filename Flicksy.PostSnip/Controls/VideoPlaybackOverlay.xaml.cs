@@ -123,7 +123,9 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void DetachPlayer(IVideoPlayer? player)
     {
-        if (player is null) return;
+        if (player is null) 
+            return;
+
         player.StateChanged -= OnPlayerStateChanged;
         player.PositionChanged -= OnPlayerPositionChanged;
         player.MediaEnded -= OnPlayerMediaEnded;
@@ -131,7 +133,9 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void SyncFromPlayer()
     {
-        if (_player is null) return;
+        if (_player is null) 
+            return;
+
         DurationSeconds = _player.Duration.TotalSeconds;
         CurrentSeconds = _player.Position.TotalSeconds;
         IsPlaying = _player.State == PlaybackState.Playing;
@@ -146,8 +150,9 @@ public partial class VideoPlaybackOverlay : UserControl
     {
         DispatchSync(() =>
         {
-            if (_player is null) return;
-            if (_isScrubbing) return;
+            if (_player is null || _isScrubbing) 
+                return;
+
             CurrentSeconds = _player.Position.TotalSeconds;
             if (_player.Duration.TotalSeconds > 0 && Math.Abs(DurationSeconds - _player.Duration.TotalSeconds) > 0.001)
             {
@@ -197,7 +202,9 @@ public partial class VideoPlaybackOverlay : UserControl
     private static void OnCurrentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var control = (VideoPlaybackOverlay)d;
-        if (control._isScrubbing) return;
+        if (control._isScrubbing) 
+            return;
+
         control._isInternalUpdate = true;
         control.TimelineSlider.Value = Math.Clamp(control.CurrentSeconds, 0, Math.Max(0, control.DurationSeconds));
         control._isInternalUpdate = false;
@@ -206,7 +213,9 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void OnPlayPauseClick(object sender, RoutedEventArgs e)
     {
-        if (_player is null) return;
+        if (_player is null) 
+            return;
+
         if (IsPlaying)
         {
             _player.Pause();
@@ -224,17 +233,21 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private async void OnSliderMouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (_scrubSource != ScrubSource.Slider) return;
-        var target = TimeSpan.FromSeconds(Math.Max(0, TimelineSlider.Value));
+        if (_scrubSource != ScrubSource.Slider) 
+            return;
+
+        TimeSpan target = TimeSpan.FromSeconds(Math.Max(0, TimelineSlider.Value));
         await EndScrubSession(target);
     }
 
     private void OnSliderValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isInternalUpdate) return;
+        if (_isInternalUpdate) 
+            return;
+
         if (_isScrubbing || TimelineSlider.IsMouseCaptureWithin)
         {
-            var current = Math.Clamp(TimelineSlider.Value, 0, Math.Max(0, DurationSeconds));
+            double current = Math.Clamp(TimelineSlider.Value, 0, Math.Max(0, DurationSeconds));
             CurrentSeconds = current;
             UpdateTimeText();
 
@@ -247,8 +260,10 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var window = Window.GetWindow(this);
-        if (window == _hostWindow) return;
+        Window window = Window.GetWindow(this);
+        if (window == _hostWindow) 
+            return;
+
         UnhookHostWindowKeys();
         _hostWindow = window;
         if (_hostWindow is not null)
@@ -270,7 +285,9 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void UnhookHostWindowKeys()
     {
-        if (_hostWindow is null) return;
+        if (_hostWindow is null) 
+            return;
+
         _hostWindow.PreviewKeyDown -= OnHostKeyDown;
         _hostWindow.PreviewKeyUp -= OnHostKeyUp;
         _hostWindow = null;
@@ -278,8 +295,11 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void OnHostKeyDown(object sender, KeyEventArgs e)
     {
-        if (_player is null) return;
-        if (_scrubSource == ScrubSource.Slider) return; // slider owns the session
+        if (_player is null) 
+            return;
+
+        if (_scrubSource == ScrubSource.Slider) 
+            return; // slider owns the session
 
         int delta = e.Key switch
         {
@@ -287,7 +307,8 @@ public partial class VideoPlaybackOverlay : UserControl
             Key.Right => +1,
             _ => 0,
         };
-        if (delta == 0) return;
+        if (delta == 0) 
+            return;
 
         e.Handled = true;
 
@@ -297,18 +318,21 @@ public partial class VideoPlaybackOverlay : UserControl
             _stepTargetTicks = _player.Position.Ticks;
         }
 
-        if (e.Key == Key.Left) _leftDown = true;
-        else if (e.Key == Key.Right) _rightDown = true;
+        if (e.Key == Key.Left) 
+            _leftDown = true;
+        else if (e.Key == Key.Right) 
+            _rightDown = true;
 
-        var frameTicks = _player.FrameDuration.Ticks;
-        if (frameTicks <= 0) frameTicks = TimeSpan.FromMilliseconds(33).Ticks;
+        long frameTicks = _player.FrameDuration.Ticks;
+        if (frameTicks <= 0) 
+            frameTicks = TimeSpan.FromMilliseconds(33).Ticks;
 
-        var maxTicks = Math.Max(0, _player.Duration.Ticks);
+        long maxTicks = Math.Max(0, _player.Duration.Ticks);
         _stepTargetTicks = Math.Clamp(_stepTargetTicks + delta * frameTicks, 0, maxTicks);
 
         // Update slider thumb + time text immediately for responsive feedback;
         // the video frame catches up when the worker's Seek completes.
-        var seconds = _stepTargetTicks / (double)TimeSpan.TicksPerSecond;
+        double seconds = _stepTargetTicks / (double)TimeSpan.TicksPerSecond;
         CurrentSeconds = seconds;
         _isInternalUpdate = true;
         TimelineSlider.Value = Math.Clamp(seconds, 0, Math.Max(0, DurationSeconds));
@@ -320,22 +344,28 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private async void OnHostKeyUp(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Left) _leftDown = false;
-        else if (e.Key == Key.Right) _rightDown = false;
-        else return;
+        if (e.Key == Key.Left) 
+            _leftDown = false;
+        else if (e.Key == Key.Right) 
+            _rightDown = false;
+        else 
+            return;
 
-        if (_scrubSource != ScrubSource.Keyboard) return;
-        if (_leftDown || _rightDown) return; // other arrow still held
+        if (_scrubSource != ScrubSource.Keyboard) 
+            return;
+
+        if (_leftDown || _rightDown) 
+            return; // other arrow still held
 
         e.Handled = true;
-        var target = TimeSpan.FromTicks(Math.Max(0, _stepTargetTicks));
+        TimeSpan target = TimeSpan.FromTicks(Math.Max(0, _stepTargetTicks));
         await EndScrubSession(target);
     }
 
     private void BeginScrubSession(ScrubSource source)
     {
-        if (_player is null) return;
-        if (_isScrubbing) return;
+        if (_player is null || _isScrubbing) 
+            return;
 
         _scrubSource = source;
         _shouldResumeAfterScrub = _player.State == PlaybackState.Playing;
@@ -358,21 +388,23 @@ public partial class VideoPlaybackOverlay : UserControl
         });
         _scrubCts = new CancellationTokenSource();
 
-        var player = _player;
-        var channel = _scrubChannel;
-        var token = _scrubCts.Token;
+        IVideoPlayer? player = _player;
+        Channel<long>? channel = _scrubChannel;
+        CancellationToken token = _scrubCts.Token;
         _scrubTask = Task.Run(() => ScrubWorkerAsync(player, channel, token));
     }
 
     private async Task EndScrubSession(TimeSpan finalTarget)
     {
-        if (!_isScrubbing) return;
+        if (!_isScrubbing) 
+            return;
+
         _isScrubbing = false;
         _scrubSource = ScrubSource.None;
 
-        var pendingTask = _scrubTask;
-        var pendingCts = _scrubCts;
-        var pendingChannel = _scrubChannel;
+        Task? pendingTask = _scrubTask;
+        CancellationTokenSource? pendingCts = _scrubCts;
+        Channel<long>? pendingChannel = _scrubChannel;
         _scrubTask = null;
         _scrubCts = null;
         _scrubChannel = null;
@@ -381,12 +413,19 @@ public partial class VideoPlaybackOverlay : UserControl
         pendingCts?.Cancel();
         if (pendingTask is not null)
         {
-            try { await pendingTask.ConfigureAwait(true); }
-            catch { /* swallow */ }
+            try 
+            { 
+                await pendingTask.ConfigureAwait(true); 
+            }
+            catch 
+            { 
+                // swallow
+            }
         }
         pendingCts?.Dispose();
 
-        if (_player is null) return;
+        if (_player is null) 
+            return;
 
         _player.Seek(finalTarget);
 
@@ -408,15 +447,27 @@ public partial class VideoPlaybackOverlay : UserControl
         {
             await foreach (var ticks in channel.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                try { player.Seek(new TimeSpan(ticks)); }
-                catch { /* swallow scrub errors */ }
+                try 
+                { 
+                    player.Seek(new TimeSpan(ticks)); 
+                }
+                catch 
+                { 
+                    // swallow scrub errors
+                }
 
                 // Yield _seekLock for ~one composition tick (60Hz ≈ 16ms) so the
                 // player's OnRendering TryEnter has a chance to grab it and present
                 // the freshly-seeked frame. Without this pause, back-to-back scrub
                 // seeks hold the lock continuously and the render path starves.
-                try { await Task.Delay(16, ct).ConfigureAwait(false); }
-                catch (OperationCanceledException) { return; }
+                try 
+                { 
+                    await Task.Delay(16, ct).ConfigureAwait(false); 
+                }
+                catch (OperationCanceledException) 
+                { 
+                    return; 
+                }
             }
         }
         catch (OperationCanceledException)
@@ -432,8 +483,8 @@ public partial class VideoPlaybackOverlay : UserControl
 
     private void UpdateTimeText()
     {
-        var current = TimeSpan.FromSeconds(Math.Max(0, CurrentSeconds));
-        var total = TimeSpan.FromSeconds(Math.Max(0, DurationSeconds));
+        TimeSpan current = TimeSpan.FromSeconds(Math.Max(0, CurrentSeconds));
+        TimeSpan total = TimeSpan.FromSeconds(Math.Max(0, DurationSeconds));
         TimeText.Text = $"{current:mm\\:ss} / {total:mm\\:ss}";
     }
 }

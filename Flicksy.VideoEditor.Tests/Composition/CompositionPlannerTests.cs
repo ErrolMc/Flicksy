@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Flicksy.VideoEditor.Composition;
 using Flicksy.VideoEditor.Project;
 
@@ -14,7 +15,7 @@ public class CompositionPlannerTests
     [Test]
     public void IsActiveAt_StartFrame_IsActive()
     {
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
         Assert.That(CompositionPlanner.IsActiveAt(clip, 10), Is.True);
     }
 
@@ -22,7 +23,7 @@ public class CompositionPlannerTests
     public void IsActiveAt_FrameJustBeforeEnd_IsActive()
     {
         // 1s @ 30fps + speed 1.0 → 30 frames. Range [10, 40) — frame 39 is still active.
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
         Assert.That(CompositionPlanner.IsActiveAt(clip, 39), Is.True);
     }
 
@@ -30,14 +31,14 @@ public class CompositionPlannerTests
     public void IsActiveAt_EndFrame_IsNotActive()
     {
         // Half-open: TimelineStart + Duration is the first frame past the clip.
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
         Assert.That(CompositionPlanner.IsActiveAt(clip, 40), Is.False);
     }
 
     [Test]
     public void IsActiveAt_FrameBeforeStart_IsNotActive()
     {
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 1);
         Assert.That(CompositionPlanner.IsActiveAt(clip, 9), Is.False);
     }
 
@@ -45,7 +46,7 @@ public class CompositionPlannerTests
     public void IsActiveAt_ZeroDurationClip_NeverActive()
     {
         // SourceOut == SourceIn → Duration = 0. Even the start frame doesn't activate.
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 0);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 0);
         Assert.That(CompositionPlanner.IsActiveAt(clip, 10), Is.False);
     }
 
@@ -54,7 +55,7 @@ public class CompositionPlannerTests
     [Test]
     public void ComputeSourceTime_AtClipStart_EqualsSourceIn()
     {
-        var clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 2, sourceInSeconds: 5);
+        MediaClip clip = MakeMediaClip(timelineStart: 10, sourceSeconds: 2, sourceInSeconds: 5);
         Assert.That(CompositionPlanner.ComputeSourceTime(clip, 10, Framerate),
             Is.EqualTo(TimeSpan.FromSeconds(5)));
     }
@@ -63,7 +64,7 @@ public class CompositionPlannerTests
     public void ComputeSourceTime_Speed1_AdvancesAtRealTime()
     {
         // 30 timeline frames @ 30fps = 1s. Speed 1 → +1s of source.
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 1.0);
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 1.0);
         Assert.That(CompositionPlanner.ComputeSourceTime(clip, 30, Framerate),
             Is.EqualTo(TimeSpan.FromSeconds(1)));
     }
@@ -72,7 +73,7 @@ public class CompositionPlannerTests
     public void ComputeSourceTime_Speed2_AdvancesAtDouble()
     {
         // 30 timeline frames @ 30fps = 1s elapsed. Speed 2 → +2s of source.
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 2.0);
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 2.0);
         Assert.That(CompositionPlanner.ComputeSourceTime(clip, 30, Framerate),
             Is.EqualTo(TimeSpan.FromSeconds(2)));
     }
@@ -81,7 +82,7 @@ public class CompositionPlannerTests
     public void ComputeSourceTime_SpeedHalf_AdvancesAtHalf()
     {
         // 30 timeline frames @ 30fps = 1s elapsed. Speed 0.5 → +0.5s of source.
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 0.5);
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, speed: 0.5);
         Assert.That(CompositionPlanner.ComputeSourceTime(clip, 30, Framerate),
             Is.EqualTo(TimeSpan.FromSeconds(0.5)));
     }
@@ -91,7 +92,7 @@ public class CompositionPlannerTests
     {
         // Clip starts at frame 30. SourceIn = 5s. Query frame 90 → elapsed 60 frames = 2s.
         // Speed 1 → +2s source. Result: 5s + 2s = 7s.
-        var clip = MakeMediaClip(timelineStart: 30, sourceSeconds: 10, sourceInSeconds: 5);
+        MediaClip clip = MakeMediaClip(timelineStart: 30, sourceSeconds: 10, sourceInSeconds: 5);
         Assert.That(CompositionPlanner.ComputeSourceTime(clip, 90, Framerate),
             Is.EqualTo(TimeSpan.FromSeconds(7)));
     }
@@ -107,7 +108,7 @@ public class CompositionPlannerTests
     [Test]
     public void ComputeSourceTime_NonPositiveFramerate_Throws()
     {
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
         Assert.Throws<ArgumentOutOfRangeException>(
             () => CompositionPlanner.ComputeSourceTime(clip, 0, 0));
     }
@@ -124,7 +125,7 @@ public class CompositionPlannerTests
     [Test]
     public void PlanFrame_NoActiveClipAtT_ReturnsEmpty()
     {
-        var project = Project.Project.CreateEmpty();
+        Project.Project project = Project.Project.CreateEmpty();
         project.Tracks[0].Clips.Add(MakeMediaClip(timelineStart: 100, sourceSeconds: 1));
         Assert.That(CompositionPlanner.PlanFrame(project, 0), Is.Empty);
     }
@@ -132,11 +133,11 @@ public class CompositionPlannerTests
     [Test]
     public void PlanFrame_ActiveMediaClip_BuildsLayerWithSpeedMappedSourceTime()
     {
-        var project = Project.Project.CreateEmpty();
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, sourceInSeconds: 5, speed: 2.0);
+        Project.Project project = Project.Project.CreateEmpty();
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 10, sourceInSeconds: 5, speed: 2.0);
         project.Tracks[0].Clips.Add(clip);
 
-        var layers = CompositionPlanner.PlanFrame(project, 30);
+        IReadOnlyList<CompositionLayer> layers = CompositionPlanner.PlanFrame(project, 30);
 
         Assert.That(layers, Has.Count.EqualTo(1));
         Assert.That(layers[0].Clip, Is.SameAs(clip));
@@ -149,7 +150,7 @@ public class CompositionPlannerTests
     [Test]
     public void PlanFrame_DisabledTrack_IsSkipped()
     {
-        var project = Project.Project.CreateEmpty();
+        Project.Project project = Project.Project.CreateEmpty();
         project.Tracks[0].Disabled = true;
         project.Tracks[0].Clips.Add(MakeMediaClip(timelineStart: 0, sourceSeconds: 1));
 
@@ -161,13 +162,13 @@ public class CompositionPlannerTests
     {
         // Muted is the audio mix's responsibility — the planner doesn't filter it.
         // The compositor's audio pass applies the per-track skip during mixing.
-        var project = Project.Project.CreateEmpty();
-        var audioTrack = project.Tracks[3];
+        Project.Project project = Project.Project.CreateEmpty();
+        Track audioTrack = project.Tracks[3];
         audioTrack.Muted = true;
-        var clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1, streams: ClipStreams.Audio);
+        MediaClip clip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1, streams: ClipStreams.Audio);
         audioTrack.Clips.Add(clip);
 
-        var layers = CompositionPlanner.PlanFrame(project, 0);
+        IReadOnlyList<CompositionLayer> layers = CompositionPlanner.PlanFrame(project, 0);
         Assert.That(layers, Has.Count.EqualTo(1));
         Assert.That(layers[0].Clip, Is.SameAs(clip));
     }
@@ -178,23 +179,23 @@ public class CompositionPlannerTests
         // Photoshop convention: the top-most track in the document (Tracks[0] = "Video 1")
         // paints LAST so it ends up on top of the visual stack. Across kinds: Video then
         // Overlay then Audio (audio has no visual z, appended for the audio mix pass).
-        var project = Project.Project.CreateEmpty();
-        var video1 = project.Tracks[0]; // UI-top
-        var video2 = project.Tracks[1]; // UI-below
-        var overlay = project.Tracks[2];
-        var audio = project.Tracks[3];
+        Project.Project project = Project.Project.CreateEmpty();
+        Track video1 = project.Tracks[0]; // UI-top
+        Track video2 = project.Tracks[1]; // UI-below
+        Track overlay = project.Tracks[2];
+        Track audio = project.Tracks[3];
 
-        var videoClip1 = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
-        var videoClip2 = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
+        MediaClip videoClip1 = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
+        MediaClip videoClip2 = MakeMediaClip(timelineStart: 0, sourceSeconds: 1);
         var overlayClip = new GraphicsClip { TimelineStart = 0, DurationFrames = 30 };
-        var audioClip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1, streams: ClipStreams.Audio);
+        MediaClip audioClip = MakeMediaClip(timelineStart: 0, sourceSeconds: 1, streams: ClipStreams.Audio);
 
         video1.Clips.Add(videoClip1);
         video2.Clips.Add(videoClip2);
         overlay.Clips.Add(overlayClip);
         audio.Clips.Add(audioClip);
 
-        var layers = CompositionPlanner.PlanFrame(project, 0);
+        IReadOnlyList<CompositionLayer> layers = CompositionPlanner.PlanFrame(project, 0);
 
         Assert.That(layers, Has.Count.EqualTo(4));
         // Video 2 paints first (bottom of stack); Video 1 paints on top of it.

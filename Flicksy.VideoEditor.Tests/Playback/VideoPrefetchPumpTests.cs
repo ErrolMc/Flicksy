@@ -34,7 +34,8 @@ public class VideoPrefetchPumpTests
     [TearDown]
     public void TearDown()
     {
-        if (_pump is null) return;
+        if (_pump is null)
+            return;
         _fake.ReleaseHold();        // let any held producer finish so Dispose can join
         _pump.Dispose();            // joins the producer, drains the queue, disposes the source
         Assert.That(_fake.OutstandingCount, Is.EqualTo(0), "buffer leak: outstanding != 0 after dispose");
@@ -49,7 +50,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Start_PrimesQueueUpToDepth_AndStops()
     {
-        var pump = CreatePump(depth: 4);
+        VideoPrefetchPump pump = CreatePump(depth: 4);
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 4), Is.True, "did not prime to depth");
         Thread.Sleep(50); // give any (incorrect) over-production a chance to show
@@ -59,7 +60,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void BeginFrame_FrontMatches_ReturnsTrue()
     {
-        var pump = CreatePump(totalFrames: 1);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 1);
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(0)), Is.True);
         Assert.That(pump.BeginFrame(0, 1.0), Is.True);
@@ -69,16 +70,16 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Acquire_ReturnsDecodedFrameForClip_NullForUnknown()
     {
-        var pump = CreatePump(totalFrames: 1);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 1);
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(0)), Is.True);
         Assert.That(pump.BeginFrame(0, 1.0), Is.True);
 
-        var frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(frame, Is.Not.Null);
         Assert.That(frame!.Value.Pts, Is.EqualTo(TimeSpan.FromSeconds(0)));
 
-        var unknown = pump.Acquire(new MediaClip { Id = Guid.NewGuid() }, TimeSpan.Zero, 1.0);
+        VideoFrame? unknown = pump.Acquire(new MediaClip { Id = Guid.NewGuid() }, TimeSpan.Zero, 1.0);
         Assert.That(unknown, Is.Null, "unknown clip should miss");
 
         pump.EndFrame();
@@ -89,7 +90,7 @@ public class VideoPrefetchPumpTests
     {
         // Producer starts at 5, so the queue holds only frames > 2; asking for 2 must miss —
         // best-effort presents the newest frame AT OR BEFORE the playhead, and there is none.
-        var pump = CreatePump(totalFrames: 56);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 56);
         pump.Start(5);
         Assert.That(Wait(() => _fake.HasProduced(5)), Is.True);
         Assert.That(pump.BeginFrame(2, 1.0), Is.False, "future-only queue should hold the previous frame");
@@ -101,7 +102,7 @@ public class VideoPrefetchPumpTests
         // Backs the engine's startup prebuffer: it's only "ready" once a frame at or before the
         // playhead is decoded — so play holds the clock until the first frame lands instead of
         // racing the playhead ahead of a cold decoder.
-        var pump = CreatePump(totalFrames: 56);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 56);
         Assert.That(pump.HasReadyFrameAt(0), Is.False, "nothing produced yet → not ready");
 
         pump.Start(5); // producer makes 5, 6, 7, ...
@@ -114,7 +115,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void EndFrame_ReturnsCurrentBuffer()
     {
-        var pump = CreatePump(totalFrames: 1);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 1);
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(0)), Is.True);
         Assert.That(pump.BeginFrame(0, 1.0), Is.True);
@@ -128,7 +129,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void BeginFrame_SkipsIntermediateFrames_ReturningTheirBuffers()
     {
-        var pump = CreatePump(depth: 12, totalFrames: 6); // 0..5
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 6); // 0..5
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 6), Is.True);
         Assert.That(_fake.OutstandingCount, Is.EqualTo(6));
@@ -144,11 +145,11 @@ public class VideoPrefetchPumpTests
     {
         // Producer far behind the playhead (only 0..3 exist, asking for 10): present the newest
         // available frame (3) rather than freeze, recycling the older ones.
-        var pump = CreatePump(depth: 12, totalFrames: 4); // 0..3
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 4); // 0..3
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 4), Is.True);
         Assert.That(pump.BeginFrame(10, 1.0), Is.True, "should present the newest available frame");
-        var frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(frame!.Value.Pts, Is.EqualTo(TimeSpan.FromSeconds(3)), "newest available is frame 3");
         Assert.That(_fake.OutstandingCount, Is.EqualTo(1), "older frames recycled; only the chosen one outstanding");
         pump.EndFrame();
@@ -161,7 +162,7 @@ public class VideoPrefetchPumpTests
         // resync threshold (30). Once it frees, the producer must jump to the playhead in ONE seek
         // (skipping 1..99), not grind through them: bounded resync keeps a sub-realtime decoder from
         // drifting unboundedly behind the open-loop audio.
-        var pump = CreatePump(resyncThreshold: 30);
+        VideoPrefetchPump pump = CreatePump(resyncThreshold: 30);
         _fake.Hold();
         _fake.ResetEntered();
         pump.Start(0);
@@ -180,7 +181,7 @@ public class VideoPrefetchPumpTests
         // Playhead only a few frames ahead of the producer (well within the resync threshold): the
         // producer must NOT jump — it decodes every intermediate frame, so a fast-enough clip plays
         // every frame rather than skipping. This is the other half of bounded resync.
-        var pump = CreatePump(resyncThreshold: 30);
+        VideoPrefetchPump pump = CreatePump(resyncThreshold: 30);
         _fake.Hold();
         _fake.ResetEntered();
         pump.Start(0);
@@ -198,7 +199,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void SeekForward_FlushesQueue_ReturnsAllBuffers()
     {
-        var pump = CreatePump(depth: 12, totalFrames: 4); // 0..3, then target 100 is past end → no reprime
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 4); // 0..3, then target 100 is past end → no reprime
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 4), Is.True);
         pump.SeekTo(100);
@@ -208,14 +209,14 @@ public class VideoPrefetchPumpTests
     [Test]
     public void SeekBackward_ServesNewFrame_NotStale()
     {
-        var pump = CreatePump(depth: 12, totalFrames: 56);
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 56);
         pump.Start(50);
         Assert.That(Wait(() => _fake.HasProduced(55)), Is.True, "did not prime 50..55");
         pump.SeekTo(10);
         Assert.That(Wait(() => _fake.HasProduced(10)), Is.True, "did not reprime from 10");
 
         Assert.That(pump.BeginFrame(10, 1.0), Is.True, "frame 10 should be served after backward seek");
-        var frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(frame!.Value.Pts, Is.EqualTo(TimeSpan.FromSeconds(10)), "served a stale pre-seek frame");
         pump.EndFrame();
     }
@@ -223,7 +224,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void SeekDuringInFlightDecode_DiscardsInFlight_NoLeak()
     {
-        var pump = CreatePump();
+        VideoPrefetchPump pump = CreatePump();
         _fake.Hold();          // freeze the producer mid-Produce
         _fake.ResetEntered();
         pump.Start(0);
@@ -239,7 +240,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void RapidSeeks_NoLeakNoDoubleReturn()
     {
-        var pump = CreatePump(depth: 8, totalFrames: 10_000);
+        VideoPrefetchPump pump = CreatePump(depth: 8, totalFrames: 10_000);
         pump.Start(0);
 
         var rng = new Random(12345);
@@ -248,7 +249,8 @@ public class VideoPrefetchPumpTests
             int target = rng.Next(0, 9000);
             pump.SeekTo(target);
             double scale = (i % 50 == 0) ? 0.5 : 1.0; // occasionally churn scale too
-            if (pump.BeginFrame(target, scale)) pump.EndFrame();
+            if (pump.BeginFrame(target, scale))
+                pump.EndFrame();
         }
         // TearDown asserts the stress left no leak and no double-return.
     }
@@ -258,7 +260,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void ScaleChange_Misses_ThenReprimesAtNewScale()
     {
-        var pump = CreatePump();
+        VideoPrefetchPump pump = CreatePump();
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 1), Is.True);
         Assert.That(pump.BeginFrame(0, 0.5), Is.False, "a scale change should miss and reprime");
@@ -270,7 +272,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void IsRunning_ReflectsLifecycle()
     {
-        var pump = CreatePump();
+        VideoPrefetchPump pump = CreatePump();
         Assert.That(pump.IsRunning, Is.False, "not running before Start");
         pump.Start(0);
         Assert.That(pump.IsRunning, Is.True, "running after Start");
@@ -281,7 +283,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Prefetch_StartsWhenIdle_RepositionsWhenRunning()
     {
-        var pump = CreatePump(totalFrames: 200);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 200);
         Assert.That(pump.IsRunning, Is.False);
 
         pump.Prefetch(10, 0.5); // idle → starts at the given frame + scale
@@ -298,7 +300,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Dispose_StopsProducer_ReturnsAllBuffers()
     {
-        var pump = CreatePump(depth: 8);
+        VideoPrefetchPump pump = CreatePump(depth: 8);
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 8), Is.True);
 
@@ -313,13 +315,13 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Dispose_DuringInFlightDecode_DoesNotThrow()
     {
-        var pump = CreatePump();
+        VideoPrefetchPump pump = CreatePump();
         _fake.Hold();
         _fake.ResetEntered();
         pump.Start(0);
         Assert.That(_fake.WaitEntered(Timeout), Is.True);
 
-        var disposeTask = Task.Run(() => pump.Dispose());
+        Task disposeTask = Task.Run(() => pump.Dispose());
         _fake.ReleaseHold(); // let the in-flight Produce finish so the join can complete
 
         Assert.That(disposeTask.Wait(Timeout), Is.True, "Dispose did not complete — join hang?");
@@ -330,7 +332,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void EndFrame_IsIdempotent_AndBeginFrameReclaimsSkippedCurrent()
     {
-        var pump = CreatePump();
+        VideoPrefetchPump pump = CreatePump();
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(0)), Is.True);
         Assert.That(pump.BeginFrame(0, 1.0), Is.True);
@@ -347,7 +349,7 @@ public class VideoPrefetchPumpTests
     [Test]
     public void Producer_StopsAtTotalFrames()
     {
-        var pump = CreatePump(depth: 12, totalFrames: 3); // only 0,1,2
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 3); // only 0,1,2
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 3), Is.True);
         Thread.Sleep(50);
@@ -357,12 +359,12 @@ public class VideoPrefetchPumpTests
     [Test]
     public void EmptyBundles_NoVideoLayers_NoLeak()
     {
-        var pump = CreatePump(totalFrames: 5);
+        VideoPrefetchPump pump = CreatePump(totalFrames: 5);
         _fake.EmptyFrames = true;
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(0)), Is.True);
         Assert.That(pump.BeginFrame(0, 1.0), Is.True);
-        var frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? frame = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(frame, Is.Null, "an empty bundle has no frames");
         pump.EndFrame();
     }
@@ -372,18 +374,18 @@ public class VideoPrefetchPumpTests
     {
         // Frame 2 is a torn read (Produce → null), never enqueued. Asking for 2 falls back to the
         // newest available before it (frame 1); frame 3 is served exactly.
-        var pump = CreatePump(depth: 12, totalFrames: 5);
+        VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 5);
         _fake.NullFrames.Add(2);
         pump.Start(0);
         Assert.That(Wait(() => _fake.HasProduced(4)), Is.True);
 
         Assert.That(pump.BeginFrame(2, 1.0), Is.True, "should fall back to the newest frame before the torn one");
-        var atTwo = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? atTwo = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(atTwo!.Value.Pts, Is.EqualTo(TimeSpan.FromSeconds(1)), "torn frame 2 → newest available is frame 1");
         pump.EndFrame();
 
         Assert.That(pump.BeginFrame(3, 1.0), Is.True, "frame 3 is available exactly");
-        var atThree = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
+        VideoFrame? atThree = pump.Acquire(new MediaClip { Id = FakeBundleSource.ClipId }, TimeSpan.Zero, 1.0);
         Assert.That(atThree!.Value.Pts, Is.EqualTo(TimeSpan.FromSeconds(3)));
         pump.EndFrame();
     }

@@ -39,7 +39,7 @@ public partial class App : Application
             return;
         }
 
-        var builder = Host.CreateApplicationBuilder();
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         // Factory registrations: a fresh empty Project per resolve, propagated up
         // through the VM into the window. EditorWithSource bypasses DI and uses
         // Project.CreateFromSourceFile() directly so the source path can flow in.
@@ -50,7 +50,7 @@ public partial class App : Application
         _host = builder.Build();
         _host.Start();
 
-        var mode = ResolveStartupMode(e.Args);
+        StartupMode mode = ResolveStartupMode(e.Args);
         Window window = mode switch
         {
             StartupMode.EmptyEditor => _host.Services.GetRequiredService<VideoEditorWindow>(),
@@ -105,7 +105,7 @@ public partial class App : Application
 
         try
         {
-            var fullPath = Path.GetFullPath(rawPath.Trim());
+            string fullPath = Path.GetFullPath(rawPath.Trim());
             if (!File.Exists(fullPath))
             {
                 return false;

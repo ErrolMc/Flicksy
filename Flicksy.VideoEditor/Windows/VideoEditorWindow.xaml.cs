@@ -63,8 +63,9 @@ public partial class VideoEditorWindow : Window
     {
         base.OnSourceInitialized(e);
 
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero) return;
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) 
+            return;
 
         int useDark = 1;
         if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)
@@ -103,8 +104,11 @@ public partial class VideoEditorWindow : Window
     {
         base.OnPreviewKeyDown(e);
 
-        if (e.IsRepeat) return;
-        if (Keyboard.FocusedElement is TextBoxBase) return;
+        if (e.IsRepeat) 
+            return;
+
+        if (Keyboard.FocusedElement is TextBoxBase) 
+            return;
 
         if (e.Key == Key.Space)
         {
@@ -205,13 +209,14 @@ public partial class VideoEditorWindow : Window
     // panel (center min + right panel current + right rail current).
     private void UpdateLeftPanelMaxWidth()
     {
-        var available = BodyGrid.ActualWidth;
-        if (available <= 0) return;
+        double available = BodyGrid.ActualWidth;
+        if (available <= 0) 
+            return;
 
-        var rightPanelW = RightPanelColumn.Width.IsAbsolute ? RightPanelColumn.Width.Value : 0;
-        var rightRailW = RightRailColumn.Width.IsAbsolute ? RightRailColumn.Width.Value : 0;
-        var reserved = LeftRailWidth + CenterMinWidth + rightPanelW + rightRailW;
-        var maxLeft = Math.Max(0, available - reserved);
+        double rightPanelW = RightPanelColumn.Width.IsAbsolute ? RightPanelColumn.Width.Value : 0;
+        double rightRailW = RightRailColumn.Width.IsAbsolute ? RightRailColumn.Width.Value : 0;
+        double reserved = LeftRailWidth + CenterMinWidth + rightPanelW + rightRailW;
+        double maxLeft = Math.Max(0, available - reserved);
 
         LeftPanelColumn.MaxWidth = maxLeft;
 

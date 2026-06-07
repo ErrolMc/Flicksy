@@ -79,7 +79,7 @@ public sealed class EraseTool : IDrawingTool
     {
         if (DrawingMath.HitTestTopmost(_viewModel.Items, point) is { } hit)
         {
-            var index = _viewModel.Items.IndexOf(hit);
+            int index = _viewModel.Items.IndexOf(hit);
             if (index < 0)
             {
                 return;

@@ -81,11 +81,12 @@ public sealed class PlayheadView : FrameworkElement
     {
         if (_viewModel is null) return;
 
-        var height = ActualHeight;
-        if (height <= 0) return;
+        double height = ActualHeight;
+        if (height <= 0) 
+            return;
 
-        var x = _viewModel.Transport.Playhead * _viewModel.PixelsPerFrame;
-        var snapped = SnapToPixel(x);
+        double x = _viewModel.Transport.Playhead * _viewModel.PixelsPerFrame;
+        double snapped = SnapToPixel(x);
         dc.DrawLine(LinePen, new Point(snapped, 0), new Point(snapped, height));
     }
 
@@ -94,7 +95,8 @@ public sealed class PlayheadView : FrameworkElement
     private static Pen MakeFrozenPen(Brush brush, double thickness)
     {
         var pen = new Pen(brush, thickness);
-        if (pen.CanFreeze) pen.Freeze();
+        if (pen.CanFreeze) 
+            pen.Freeze();
         return pen;
     }
 }

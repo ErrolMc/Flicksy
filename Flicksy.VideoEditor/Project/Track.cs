@@ -46,8 +46,10 @@ public partial class Track : ObservableObject
     /// </summary>
     public IReadOnlyList<Transition> RemoveTransitionsFor(Clip clip)
     {
-        var removed = Transitions.Where(t => t.LeftClipId == clip.Id || t.RightClipId == clip.Id).ToList();
-        foreach (var t in removed) Transitions.Remove(t);
+        List<Transition> removed = Transitions.Where(t => t.LeftClipId == clip.Id || t.RightClipId == clip.Id).ToList();
+        foreach (Transition t in removed) 
+            Transitions.Remove(t);
+
         return removed;
     }
 
@@ -63,9 +65,9 @@ public partial class Track : ObservableObject
     /// </summary>
     public void ReassignTransitionsForSplit(Clip original, Clip leftHalf, Clip rightHalf)
     {
-        for (var i = 0; i < Transitions.Count; i++)
+        for (int i = 0; i < Transitions.Count; i++)
         {
-            var t = Transitions[i];
+            Transition t = Transitions[i];
             if (t.LeftClipId == original.Id && rightHalf.Id != original.Id)
             {
                 Transitions[i] = new Transition { LeftClipId = rightHalf.Id, RightClipId = t.RightClipId, Type = t.Type, Duration = t.Duration };

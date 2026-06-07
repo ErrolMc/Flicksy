@@ -41,8 +41,11 @@ public partial class MediaPanel : UserControl
 
     private void OnPanelDrop(object sender, DragEventArgs e)
     {
-        if (DataContext is not MediaBinViewModel vm) return;
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        if (DataContext is not MediaBinViewModel vm) 
+            return;
+
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) 
+            return;
 
         if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
         {
@@ -53,11 +56,16 @@ public partial class MediaPanel : UserControl
 
     private static bool IsAcceptedFileDrop(DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return false;
-        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return false;
-        foreach (var path in paths)
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) 
+            return false;
+
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) 
+            return false;
+
+        foreach (string path in paths)
         {
-            if (MediaBinViewModel.IsAcceptedMediaPath(path)) return true;
+            if (MediaBinViewModel.IsAcceptedMediaPath(path)) 
+                return true;
         }
         return false;
     }
@@ -70,13 +78,17 @@ public partial class MediaPanel : UserControl
     // initiation (no payload — the drop matrix would refuse them anyway).
     private void OnPanelPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is not MediaBinViewModel vm) return;
-        if (e.OriginalSource is not DependencyObject d) return;
+        if (DataContext is not MediaBinViewModel vm) 
+            return;
 
-        var item = FindAncestor<ListBoxItem>(d);
+        if (e.OriginalSource is not DependencyObject d) 
+            return;
+
+        ListBoxItem? item = FindAncestor<ListBoxItem>(d);
         if (item is null)
         {
-            if (vm.SelectedSource is not null) vm.SelectedSource = null;
+            if (vm.SelectedSource is not null) 
+                vm.SelectedSource = null;
             return;
         }
 
@@ -89,21 +101,23 @@ public partial class MediaPanel : UserControl
 
     private void OnPanelPreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (_pendingDragEntry is null) return;
+        if (_pendingDragEntry is null) 
+            return;
+
         if (e.LeftButton != MouseButtonState.Pressed)
         {
             _pendingDragEntry = null;
             return;
         }
 
-        var current = e.GetPosition(this);
+        Point current = e.GetPosition(this);
         if (Math.Abs(current.X - _dragOriginScreen.X) < SystemParameters.MinimumHorizontalDragDistance
             && Math.Abs(current.Y - _dragOriginScreen.Y) < SystemParameters.MinimumVerticalDragDistance)
         {
             return;
         }
 
-        var entry = _pendingDragEntry;
+        MediaSourceViewModel entry = _pendingDragEntry;
         _pendingDragEntry = null;
         StartDrag(entry);
     }
@@ -120,9 +134,9 @@ public partial class MediaPanel : UserControl
     // cancelled mid-flight (Esc, source removal, etc.).
     private void StartDrag(MediaSourceViewModel entry)
     {
-        var window = Window.GetWindow(this);
-        var content = window?.Content as UIElement;
-        var layer = content is not null ? AdornerLayer.GetAdornerLayer(content) : null;
+        Window window = Window.GetWindow(this);
+        UIElement? content = window?.Content as UIElement;
+        AdornerLayer? layer = content is not null ? AdornerLayer.GetAdornerLayer(content) : null;
 
         DragThumbnailAdorner? adorner = null;
         DragEventHandler? onPreviewDragOver = null;
@@ -144,7 +158,7 @@ public partial class MediaPanel : UserControl
             {
                 if (Mouse.PrimaryDevice.DirectlyOver is IInputElement el)
                 {
-                    var p = Mouse.GetPosition(content);
+                    Point p = Mouse.GetPosition(content);
                     adorner.UpdatePosition(p);
                 }
             };
@@ -175,10 +189,12 @@ public partial class MediaPanel : UserControl
 
     private static T? FindAncestor<T>(DependencyObject start) where T : DependencyObject
     {
-        var current = start;
+        DependencyObject current = start;
         while (current is not null)
         {
-            if (current is T match) return match;
+            if (current is T match) 
+                return match;
+
             current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current);
         }
         return null;
@@ -192,8 +208,12 @@ public partial class MediaPanel : UserControl
 
     private void OnRenameTextBoxVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (sender is not TextBox tb) return;
-        if (e.NewValue is not true) return;
+        if (sender is not TextBox tb) 
+            return;
+
+        if (e.NewValue is not true) 
+            return;
+
         // Posting via Dispatcher is more reliable than calling Focus() inline — the
         // TextBox is mid-template-instantiation when IsVisibleChanged fires, and an
         // immediate Focus() call can be no-op'd by WPF still finishing the layout pass.
@@ -206,9 +226,14 @@ public partial class MediaPanel : UserControl
 
     private void OnRenameTextBoxKeyDown(object sender, KeyEventArgs e)
     {
-        if (sender is not TextBox tb) return;
-        if (tb.DataContext is not MediaSourceViewModel entry) return;
-        if (DataContext is not MediaBinViewModel vm) return;
+        if (sender is not TextBox tb) 
+            return;
+
+        if (tb.DataContext is not MediaSourceViewModel entry) 
+            return;
+
+        if (DataContext is not MediaBinViewModel vm) 
+            return;
 
         if (e.Key == Key.Enter)
         {
@@ -224,9 +249,14 @@ public partial class MediaPanel : UserControl
 
     private void OnRenameTextBoxLostFocus(object sender, RoutedEventArgs e)
     {
-        if (sender is not TextBox tb) return;
-        if (tb.DataContext is not MediaSourceViewModel entry) return;
-        if (DataContext is not MediaBinViewModel vm) return;
+        if (sender is not TextBox tb) 
+            return;
+
+        if (tb.DataContext is not MediaSourceViewModel entry) 
+            return;
+
+        if (DataContext is not MediaBinViewModel vm) 
+            return;
 
         vm.CommitRenameCommand.Execute(entry);
     }
@@ -264,7 +294,7 @@ internal sealed class DragThumbnailAdorner : Adorner
 
     protected override void OnRender(DrawingContext dc)
     {
-        var origin = _position + CursorOffset;
+        Point origin = _position + CursorOffset;
         double width = TargetWidth;
         double height = PlaceholderHeight;
         if (_thumbnail is not null && _thumbnail.Width > 0 && _thumbnail.Height > 0)

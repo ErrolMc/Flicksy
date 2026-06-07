@@ -107,7 +107,7 @@ public partial class SelectionOverlayView : UserControl
 
     private void UpdateLayoutFromState()
     {
-        var vm = ViewModel;
+        SelectionOverlayViewModel? vm = ViewModel;
         if (vm is null || !vm.IsVisible || vm.SelectedItem is not { } item)
         {
             Visibility = Visibility.Collapsed;
@@ -116,14 +116,14 @@ public partial class SelectionOverlayView : UserControl
 
         Visibility = Visibility.Visible;
 
-        var canonical = vm.CanonicalBounds;
-        var itemMatrix = item.Transform.Matrix;
-        var viewportTransform = ContentToViewport;
+        Rect canonical = vm.CanonicalBounds;
+        Matrix itemMatrix = item.Transform.Matrix;
+        Transform? viewportTransform = ContentToViewport;
 
-        var tlVp = ProjectCorner(canonical.Left, canonical.Top, itemMatrix, viewportTransform);
-        var trVp = ProjectCorner(canonical.Right, canonical.Top, itemMatrix, viewportTransform);
-        var brVp = ProjectCorner(canonical.Right, canonical.Bottom, itemMatrix, viewportTransform);
-        var blVp = ProjectCorner(canonical.Left, canonical.Bottom, itemMatrix, viewportTransform);
+        Point tlVp = ProjectCorner(canonical.Left, canonical.Top, itemMatrix, viewportTransform);
+        Point trVp = ProjectCorner(canonical.Right, canonical.Top, itemMatrix, viewportTransform);
+        Point brVp = ProjectCorner(canonical.Right, canonical.Bottom, itemMatrix, viewportTransform);
+        Point blVp = ProjectCorner(canonical.Left, canonical.Bottom, itemMatrix, viewportTransform);
 
         SelectionBox.Points = new PointCollection { tlVp, trVp, brVp, blVp };
 
@@ -142,20 +142,20 @@ public partial class SelectionOverlayView : UserControl
         // Rotate puck: midpoint of top edge in viewport space, offset perpendicular to that edge.
         var topMid = new Point((tlVp.X + trVp.X) / 2.0, (tlVp.Y + trVp.Y) / 2.0);
         var topEdge = new Vector(trVp.X - tlVp.X, trVp.Y - tlVp.Y);
-        var len = topEdge.Length;
+        double len = topEdge.Length;
         Vector outward = len > double.Epsilon
             ? new Vector(topEdge.Y / len, -topEdge.X / len)   // 90° CW of top-edge direction = outward "up"
             : new Vector(0, -1);
 
-        var puckOffset = RotateHandleGap + RotateHandleSize / 2.0;
-        var puckCenter = topMid + outward * puckOffset;
+        double puckOffset = RotateHandleGap + RotateHandleSize / 2.0;
+        Point puckCenter = topMid + outward * puckOffset;
         Canvas.SetLeft(RotateHandle, puckCenter.X - RotateHandleSize / 2.0);
         Canvas.SetTop(RotateHandle, puckCenter.Y - RotateHandleSize / 2.0);
     }
 
     private static Point ProjectCorner(double x, double y, Matrix itemMatrix, Transform? viewportTransform)
     {
-        var content = itemMatrix.Transform(new Point(x, y));
+        Point content = itemMatrix.Transform(new Point(x, y));
         return viewportTransform is not null
             ? viewportTransform.Transform(content)
             : content;
@@ -174,20 +174,20 @@ public partial class SelectionOverlayView : UserControl
             return;
         }
 
-        var canonical = vm.CanonicalBounds;
+        Rect canonical = vm.CanonicalBounds;
         var canonicalCenter = new Point(
             canonical.X + canonical.Width / 2.0,
             canonical.Y + canonical.Height / 2.0);
 
-        var itemMatrix = item.Transform.Matrix;
-        var centerWorld = itemMatrix.Transform(canonicalCenter);
+        Matrix itemMatrix = item.Transform.Matrix;
+        Point centerWorld = itemMatrix.Transform(canonicalCenter);
 
-        var viewportTransform = ContentToViewport;
-        var centerViewport = viewportTransform is not null
+        Transform? viewportTransform = ContentToViewport;
+        Point centerViewport = viewportTransform is not null
             ? viewportTransform.Transform(centerWorld)
             : centerWorld;
 
-        var cursor = e.GetPosition(this);
+        Point cursor = e.GetPosition(this);
 
         _rotatingItem = item;
         _rotationBaseMatrix = itemMatrix;
@@ -208,9 +208,9 @@ public partial class SelectionOverlayView : UserControl
             return;
         }
 
-        var cursor = e.GetPosition(this);
-        var currentAngle = Math.Atan2(cursor.Y - _rotationCenterViewport.Y, cursor.X - _rotationCenterViewport.X);
-        var deltaDegrees = (currentAngle - _rotationInitialAngle) * 180.0 / Math.PI;
+        Point cursor = e.GetPosition(this);
+        double currentAngle = Math.Atan2(cursor.Y - _rotationCenterViewport.Y, cursor.X - _rotationCenterViewport.X);
+        double deltaDegrees = (currentAngle - _rotationInitialAngle) * 180.0 / Math.PI;
         _rotatingItem.RotateFrom(_rotationBaseMatrix, deltaDegrees, _rotationCenterWorld);
     }
 

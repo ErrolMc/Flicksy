@@ -18,7 +18,7 @@ public sealed class AddItemCommand : IUndoableCommand
 
     public void Redo()
     {
-        var insertIndex = _index < 0 || _index > _viewModel.Items.Count
+        int insertIndex = _index < 0 || _index > _viewModel.Items.Count
             ? _viewModel.Items.Count
             : _index;
         _viewModel.Items.Insert(insertIndex, _item);

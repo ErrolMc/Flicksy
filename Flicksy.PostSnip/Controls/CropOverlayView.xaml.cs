@@ -113,7 +113,7 @@ public partial class CropOverlayView : UserControl
 
     private void UpdateLayoutFromState()
     {
-        var vm = ViewModel;
+        CropOverlayViewModel? vm = ViewModel;
         if (vm is null || !vm.IsActive || !vm.HasImage)
         {
             Visibility = Visibility.Collapsed;
@@ -122,20 +122,20 @@ public partial class CropOverlayView : UserControl
 
         Visibility = Visibility.Visible;
 
-        var crop = vm.EffectiveCrop;
-        var imageRect = vm.ImageBounds;
-        var transform = ContentToViewport;
+        Rect crop = vm.EffectiveCrop;
+        Rect imageRect = vm.ImageBounds;
+        Transform? transform = ContentToViewport;
 
-        var cropVp = TransformRect(transform, crop);
-        var imageVp = TransformRect(transform, imageRect);
+        Rect cropVp = TransformRect(transform, crop);
+        Rect imageVp = TransformRect(transform, imageRect);
 
         // Dim regions: cover the image area outside the crop rect.
-        var leftWidth = Math.Max(0, cropVp.Left - imageVp.Left);
-        var rightX = cropVp.Right;
-        var rightWidth = Math.Max(0, imageVp.Right - cropVp.Right);
-        var topHeight = Math.Max(0, cropVp.Top - imageVp.Top);
-        var bottomY = cropVp.Bottom;
-        var bottomHeight = Math.Max(0, imageVp.Bottom - cropVp.Bottom);
+        double leftWidth = Math.Max(0, cropVp.Left - imageVp.Left);
+        double rightX = cropVp.Right;
+        double rightWidth = Math.Max(0, imageVp.Right - cropVp.Right);
+        double topHeight = Math.Max(0, cropVp.Top - imageVp.Top);
+        double bottomY = cropVp.Bottom;
+        double bottomHeight = Math.Max(0, imageVp.Bottom - cropVp.Bottom);
 
         SetCanvasRect(TopShade, imageVp.Left, imageVp.Top, imageVp.Width, topHeight);
         SetCanvasRect(BottomShade, imageVp.Left, bottomY, imageVp.Width, bottomHeight);
@@ -147,11 +147,11 @@ public partial class CropOverlayView : UserControl
 
         // Corner brackets: L-shapes positioned just inside each corner so the
         // stroke straddles the crop edge.
-        var l = cropVp.Left;
-        var t = cropVp.Top;
-        var r = cropVp.Right;
-        var b = cropVp.Bottom;
-        var arm = Math.Min(BracketArmLength, Math.Min(cropVp.Width, cropVp.Height) / 2.0);
+        double l = cropVp.Left;
+        double t = cropVp.Top;
+        double r = cropVp.Right;
+        double b = cropVp.Bottom;
+        double arm = Math.Min(BracketArmLength, Math.Min(cropVp.Width, cropVp.Height) / 2.0);
 
         SetBracketPoints(TopLeftBracket, new Point(l, t + arm), new Point(l, t), new Point(l + arm, t));
         SetBracketPoints(TopRightBracket, new Point(r - arm, t), new Point(r, t), new Point(r, t + arm));
@@ -159,10 +159,11 @@ public partial class CropOverlayView : UserControl
         SetBracketPoints(BottomRightBracket, new Point(r - arm, b), new Point(r, b), new Point(r, b - arm));
 
         // Edge midpoint markers — short white bars centered on each edge midpoint.
-        var midX = (l + r) / 2.0;
-        var midY = (t + b) / 2.0;
-        var markerLen = Math.Min(EdgeMarkerLength, Math.Min(cropVp.Width, cropVp.Height) - 2 * arm);
-        if (markerLen < 4) markerLen = 0;
+        double midX = (l + r) / 2.0;
+        double midY = (t + b) / 2.0;
+        double markerLen = Math.Min(EdgeMarkerLength, Math.Min(cropVp.Width, cropVp.Height) - 2 * arm);
+        if (markerLen < 4) 
+            markerLen = 0;
 
         if (markerLen > 0)
         {
@@ -188,24 +189,24 @@ public partial class CropOverlayView : UserControl
     {
         base.OnMouseLeftButtonDown(e);
 
-        var vm = ViewModel;
+        CropOverlayViewModel? vm = ViewModel;
         if (vm is null || !vm.IsActive || !vm.HasImage)
         {
             return;
         }
 
-        var viewportPoint = e.GetPosition(OverlayCanvas);
-        var imagePoint = ToImagePoint(viewportPoint);
-        var imageRect = vm.ImageBounds;
+        Point viewportPoint = e.GetPosition(OverlayCanvas);
+        Point imagePoint = ToImagePoint(viewportPoint);
+        Rect imageRect = vm.ImageBounds;
         if (!ContainsInclusive(imageRect, imagePoint))
         {
             return;
         }
 
-        var crop = vm.EffectiveCrop;
-        var cropVp = TransformRect(ContentToViewport, crop);
+        Rect crop = vm.EffectiveCrop;
+        Rect cropVp = TransformRect(ContentToViewport, crop);
 
-        var gesture = DetermineGesture(viewportPoint, cropVp);
+        GestureKind gesture = DetermineGesture(viewportPoint, cropVp);
         if (gesture == GestureKind.None)
         {
             return;
@@ -229,7 +230,7 @@ public partial class CropOverlayView : UserControl
     {
         base.OnMouseMove(e);
 
-        var vm = ViewModel;
+        CropOverlayViewModel? vm = ViewModel;
         if (vm is null || !vm.IsActive || !vm.HasImage)
         {
             return;
@@ -241,7 +242,7 @@ public partial class CropOverlayView : UserControl
             return;
         }
 
-        var imagePoint = ClampToImage(ToImagePoint(e.GetPosition(OverlayCanvas)), vm);
+        Point imagePoint = ClampToImage(ToImagePoint(e.GetPosition(OverlayCanvas)), vm);
 
         Rect newCrop = _gesture switch
         {
@@ -274,7 +275,7 @@ public partial class CropOverlayView : UserControl
 
     private void UpdateCursor(Point viewportPoint, CropOverlayViewModel vm)
     {
-        var cropVp = TransformRect(ContentToViewport, vm.EffectiveCrop);
+        Rect cropVp = TransformRect(ContentToViewport, vm.EffectiveCrop);
         Cursor = DetermineGesture(viewportPoint, cropVp) switch
         {
             GestureKind.MoveRect => Cursors.SizeAll,
@@ -294,27 +295,41 @@ public partial class CropOverlayView : UserControl
             return GestureKind.DrawNew;
         }
 
-        var halfCorner = CornerHitSize / 2.0;
-        var halfEdge = EdgeHitThickness / 2.0;
+        double halfCorner = CornerHitSize / 2.0;
+        double halfEdge = EdgeHitThickness / 2.0;
 
         // Corner hit boxes (centered on each corner point).
-        if (InBox(viewportPoint, cropVp.Left, cropVp.Top, halfCorner)) return GestureKind.ResizeTopLeft;
-        if (InBox(viewportPoint, cropVp.Right, cropVp.Top, halfCorner)) return GestureKind.ResizeTopRight;
-        if (InBox(viewportPoint, cropVp.Left, cropVp.Bottom, halfCorner)) return GestureKind.ResizeBottomLeft;
-        if (InBox(viewportPoint, cropVp.Right, cropVp.Bottom, halfCorner)) return GestureKind.ResizeBottomRight;
+        if (InBox(viewportPoint, cropVp.Left, cropVp.Top, halfCorner)) 
+            return GestureKind.ResizeTopLeft;
+
+        if (InBox(viewportPoint, cropVp.Right, cropVp.Top, halfCorner)) 
+            return GestureKind.ResizeTopRight;
+
+        if (InBox(viewportPoint, cropVp.Left, cropVp.Bottom, halfCorner)) 
+            return GestureKind.ResizeBottomLeft;
+
+        if (InBox(viewportPoint, cropVp.Right, cropVp.Bottom, halfCorner)) 
+            return GestureKind.ResizeBottomRight;
 
         // Edge strips (excluding the corner squares).
-        var withinTopBand = Math.Abs(viewportPoint.Y - cropVp.Top) <= halfEdge;
-        var withinBottomBand = Math.Abs(viewportPoint.Y - cropVp.Bottom) <= halfEdge;
-        var withinLeftBand = Math.Abs(viewportPoint.X - cropVp.Left) <= halfEdge;
-        var withinRightBand = Math.Abs(viewportPoint.X - cropVp.Right) <= halfEdge;
-        var withinHorizontalRange = viewportPoint.X >= cropVp.Left - halfEdge && viewportPoint.X <= cropVp.Right + halfEdge;
-        var withinVerticalRange = viewportPoint.Y >= cropVp.Top - halfEdge && viewportPoint.Y <= cropVp.Bottom + halfEdge;
+        bool withinTopBand = Math.Abs(viewportPoint.Y - cropVp.Top) <= halfEdge;
+        bool withinBottomBand = Math.Abs(viewportPoint.Y - cropVp.Bottom) <= halfEdge;
+        bool withinLeftBand = Math.Abs(viewportPoint.X - cropVp.Left) <= halfEdge;
+        bool withinRightBand = Math.Abs(viewportPoint.X - cropVp.Right) <= halfEdge;
+        bool withinHorizontalRange = viewportPoint.X >= cropVp.Left - halfEdge && viewportPoint.X <= cropVp.Right + halfEdge;
+        bool withinVerticalRange = viewportPoint.Y >= cropVp.Top - halfEdge && viewportPoint.Y <= cropVp.Bottom + halfEdge;
 
-        if (withinTopBand && withinHorizontalRange) return GestureKind.ResizeTop;
-        if (withinBottomBand && withinHorizontalRange) return GestureKind.ResizeBottom;
-        if (withinLeftBand && withinVerticalRange) return GestureKind.ResizeLeft;
-        if (withinRightBand && withinVerticalRange) return GestureKind.ResizeRight;
+        if (withinTopBand && withinHorizontalRange) 
+            return GestureKind.ResizeTop;
+
+        if (withinBottomBand && withinHorizontalRange) 
+            return GestureKind.ResizeBottom;
+
+        if (withinLeftBand && withinVerticalRange) 
+            return GestureKind.ResizeLeft;
+
+        if (withinRightBand && withinVerticalRange) 
+            return GestureKind.ResizeRight;
 
         // Inside the crop.
         if (cropVp.Contains(viewportPoint))
@@ -383,8 +398,8 @@ public partial class CropOverlayView : UserControl
 
     private static Rect MoveCrop(Rect startCrop, Vector delta, CropOverlayViewModel vm)
     {
-        var newX = startCrop.X + delta.X;
-        var newY = startCrop.Y + delta.Y;
+        double newX = startCrop.X + delta.X;
+        double newY = startCrop.Y + delta.Y;
         newX = Math.Max(0, Math.Min(newX, vm.ImageWidth - startCrop.Width));
         newY = Math.Max(0, Math.Min(newY, vm.ImageHeight - startCrop.Height));
         return new Rect(newX, newY, startCrop.Width, startCrop.Height);
@@ -392,10 +407,10 @@ public partial class CropOverlayView : UserControl
 
     private static Rect RectFromPoints(Point a, Point b)
     {
-        var left = Math.Min(a.X, b.X);
-        var top = Math.Min(a.Y, b.Y);
-        var width = Math.Abs(a.X - b.X);
-        var height = Math.Abs(a.Y - b.Y);
+        double left = Math.Min(a.X, b.X);
+        double top = Math.Min(a.Y, b.Y);
+        double width = Math.Abs(a.X - b.X);
+        double height = Math.Abs(a.Y - b.Y);
         return new Rect(left, top, width, height);
     }
 
@@ -439,7 +454,7 @@ public partial class CropOverlayView : UserControl
 
     private static void SetBracketPoints(Polyline polyline, Point a, Point b, Point c)
     {
-        var points = polyline.Points;
+        PointCollection points = polyline.Points;
         if (points.Count == 3)
         {
             points[0] = a;

@@ -38,7 +38,7 @@ public partial class App : Application
             return;
         }
 
-        var builder = Host.CreateApplicationBuilder();
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         builder.Services.AddTransient<IVideoPlayer, FFmpegVideoPlayer>();
         builder.Services.AddTransient<ImageEditToolsViewModel>();
         builder.Services.AddTransient<DrawingViewModel>();
@@ -51,7 +51,7 @@ public partial class App : Application
 
         var window = _host.Services.GetRequiredService<PostSnipWindow>();
         var configuration = _host.Services.GetRequiredService<IConfiguration>();
-        var mediaPath = ResolveStartupMediaPath(e.Args, configuration);
+        string? mediaPath = ResolveStartupMediaPath(e.Args, configuration);
 
         MainWindow = window;
         window.Show();
@@ -81,7 +81,7 @@ public partial class App : Application
             try
             {
                 window.ViewModel.PreserveMediaFile = true;
-                var extension = Path.GetExtension(mediaPath).ToLowerInvariant();
+                string extension = Path.GetExtension(mediaPath).ToLowerInvariant();
                 if (IsVideoExtension(extension))
                 {
                     await window.ViewModel.LoadVideoAsync(mediaPath).ConfigureAwait(true);
@@ -110,7 +110,7 @@ public partial class App : Application
 
     private static string? ResolveStartupMediaPath(string[] args, IConfiguration configuration)
     {
-        var argumentPath = GetLaunchFilePathFromArguments(args) ?? args.FirstOrDefault();
+        string? argumentPath = GetLaunchFilePathFromArguments(args) ?? args.FirstOrDefault();
         if (TryValidatePath(argumentPath, out var validatedFromArgs))
         {
             return validatedFromArgs;
@@ -123,7 +123,7 @@ public partial class App : Application
 
     private static string? GetLaunchFilePathFromArguments(string[] args)
     {
-        for (var i = 0; i < args.Length; i++)
+        for (int i = 0; i < args.Length; i++)
         {
             if (!args[i].Equals(LaunchFilePathArgName, StringComparison.OrdinalIgnoreCase))
             {
@@ -151,7 +151,7 @@ public partial class App : Application
 
         try
         {
-            var fullPath = Path.GetFullPath(rawPath.Trim());
+            string fullPath = Path.GetFullPath(rawPath.Trim());
             if (!File.Exists(fullPath))
             {
                 return false;

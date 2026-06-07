@@ -61,12 +61,12 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
                 StreamsToLoad = MediaMode.Video,
                 VideoPixelFormat = ImagePixelFormat.Bgra32,
             };
-            var file = MediaFile.Open(path, options);
+            MediaFile file = MediaFile.Open(path, options);
             _file = file;
             Duration = file.Video.Info.Duration;
             FrameWidth = file.Video.Info.FrameSize.Width;
             FrameHeight = file.Video.Info.FrameSize.Height;
-            var fps = file.Video.Info.AvgFrameRate;
+            double fps = file.Video.Info.AvgFrameRate;
             FrameDuration = fps > 0 ? TimeSpan.FromSeconds(1.0 / fps) : TimeSpan.FromMilliseconds(33);
         }, cancellationToken).ConfigureAwait(true);
 
@@ -79,9 +79,9 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
         _mediaEndedRaised = false;
         _pendingFrame = null;
 
-        var framesRef = _frames;
-        var fileRef = _file;
-        var ct = _decodeCts.Token;
+        BlockingCollection<VideoFrame> framesRef = _frames;
+        MediaFile? fileRef = _file;
+        CancellationToken ct = _decodeCts.Token;
         _decodeTask = Task.Run(() => DecodeLoop(fileRef!, framesRef, ct), ct);
 
         var first = await Task.Run(() =>
@@ -102,7 +102,8 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
     public void Play()
     {
         EnsureNotDisposed();
-        if (_file is null) return;
+        if (_file is null) 
+            return;
 
         if (_state == PlaybackState.Ended)
         {
@@ -117,7 +118,8 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
     public void Pause()
     {
         EnsureNotDisposed();
-        if (_file is null) return;
+        if (_file is null) 
+            return;
 
         if (_state == PlaybackState.Playing)
         {
@@ -130,13 +132,17 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
     public void Seek(TimeSpan position)
     {
         EnsureNotDisposed();
-        if (_file is null) return;
+        if (_file is null) 
+            return;
 
         var clamped = position;
-        if (clamped < TimeSpan.Zero) clamped = TimeSpan.Zero;
-        if (Duration > TimeSpan.Zero && clamped > Duration) clamped = Duration;
+        if (clamped < TimeSpan.Zero) 
+            clamped = TimeSpan.Zero;
 
-        var wasPlaying = _state == PlaybackState.Playing;
+        if (Duration > TimeSpan.Zero && clamped > Duration) 
+            clamped = Duration;
+
+        bool wasPlaying = _state == PlaybackState.Playing;
         DoSeek(clamped, resumePlayback: wasPlaying);
     }
 
@@ -144,7 +150,9 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
         CloseInternal();
     }
@@ -153,7 +161,8 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
     {
         lock (_seekLock)
         {
-            if (_file is null) return;
+            if (_file is null) 
+                return;
 
             // Stop decoder
             _decodeCts?.Cancel();
@@ -179,6 +188,7 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
                 _frames.Dispose();
                 _frames = null;
             }
+
             if (_pendingFrame.HasValue)
             {
                 ArrayPool<byte>.Shared.Return(_pendingFrame.Value.Buffer);
@@ -196,10 +206,10 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
             // Seek + decode the target frame inline so the user sees an immediate update.
             try
             {
-                var image = _file.Video.GetFrame(target);
-                var data = image.Data;
-                var len = data.Length;
-                var buf = ArrayPool<byte>.Shared.Rent(len);
+                ImageData image = _file.Video.GetFrame(target);
+                Span<byte> data = image.Data;
+                int len = data.Length;
+                byte[] buf = ArrayPool<byte>.Shared.Rent(len);
                 data.CopyTo(buf);
 
                 _pendingFrame = new VideoFrame(
@@ -215,9 +225,9 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
             // Restart decoder from the new position
             _frames = new BlockingCollection<VideoFrame>(boundedCapacity: FrameQueueCapacity);
             _decodeCts = new CancellationTokenSource();
-            var framesRef = _frames;
-            var fileRef = _file;
-            var ct = _decodeCts.Token;
+            BlockingCollection<VideoFrame> framesRef = _frames;
+            MediaFile fileRef = _file;
+            CancellationToken ct = _decodeCts.Token;
             _decodeTask = Task.Run(() => DecodeLoop(fileRef, framesRef, ct), ct);
 
             if (resumePlayback)
@@ -246,12 +256,12 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
                     return;
                 }
 
-                var data = image.Data;
-                var len = data.Length;
-                var buf = ArrayPool<byte>.Shared.Rent(len);
+                Span<byte> data = image.Data;
+                int len = data.Length;
+                byte[] buf = ArrayPool<byte>.Shared.Rent(len);
                 data.CopyTo(buf);
 
-                var pts = file.Video.Position;
+                TimeSpan pts = file.Video.Position;
                 var frame = new VideoFrame(
                     buf, len,
                     image.ImageSize.Width, image.ImageSize.Height,
@@ -281,20 +291,31 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
         }
         catch
         {
-            try { frames.CompleteAdding(); } catch { /* ignore */ }
+            try 
+            { 
+                frames.CompleteAdding(); 
+            } 
+            catch 
+            { 
+                // ignore
+            }
         }
     }
 
     private void HookRendering()
     {
-        if (_renderingHooked) return;
+        if (_renderingHooked) 
+            return;
+
         CompositionTarget.Rendering += OnRendering;
         _renderingHooked = true;
     }
 
     private void UnhookRendering()
     {
-        if (!_renderingHooked) return;
+        if (!_renderingHooked) 
+            return;
+
         CompositionTarget.Rendering -= OnRendering;
         _renderingHooked = false;
     }
@@ -314,9 +335,10 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
         }
         try
         {
-            if (_frames is null) return;
+            if (_frames is null) 
+                return;
 
-            var elapsed = _clockOffset + _clock.Elapsed;
+            TimeSpan elapsed = _clockOffset + _clock.Elapsed;
 
             if (!_pendingFrame.HasValue && _frames.TryTake(out var firstAvailable))
             {
@@ -351,7 +373,7 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
 
         if (toPresent.HasValue)
         {
-            var f = toPresent.Value;
+            VideoFrame f = toPresent.Value;
             try
             {
                 FrameReady?.Invoke(this, f);
@@ -382,11 +404,14 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
         }
         try
         {
-            if (_mediaEndedRaised) return;
-            if (_frames is null) return;
-            if (!_frames.IsAddingCompleted) return;
-            if (_pendingFrame.HasValue || _frames.Count > 0) return;
-            if (_state == PlaybackState.Ended) return;
+            if (_mediaEndedRaised 
+                || _frames is null 
+                || !_frames.IsAddingCompleted 
+                || (_pendingFrame.HasValue || _frames.Count > 0) 
+                || _state == PlaybackState.Ended)
+            {
+                return;
+            }
 
             _mediaEndedRaised = true;
             _clock.Stop();
@@ -411,7 +436,9 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
 
     private void SetState(PlaybackState newState)
     {
-        if (_state == newState) return;
+        if (_state == newState) 
+            return;
+
         _state = newState;
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -445,13 +472,27 @@ public sealed class FFmpegVideoPlayer : IVideoPlayer
             {
                 ArrayPool<byte>.Shared.Return(f.Buffer);
             }
-            try { _frames.Dispose(); } catch { /* ignore */ }
+            try 
+            { 
+                _frames.Dispose(); 
+            } 
+            catch 
+            {
+                // ignore
+            }
             _frames = null;
         }
 
         if (_file is not null)
         {
-            try { _file.Dispose(); } catch { /* ignore */ }
+            try 
+            { 
+                _file.Dispose(); 
+            } 
+            catch 
+            { 
+                // ignore
+            }
             _file = null;
         }
 

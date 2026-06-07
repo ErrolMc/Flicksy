@@ -31,7 +31,7 @@ public static class FfmpegLocator
     private static IEnumerable<string?> EnumerateCandidates()
     {
         // 1. Explicit env var override.
-        var home = Environment.GetEnvironmentVariable("FFMPEG_HOME");
+        string? home = Environment.GetEnvironmentVariable("FFMPEG_HOME");
         if (!string.IsNullOrWhiteSpace(home))
         {
             yield return home;
@@ -39,7 +39,7 @@ public static class FfmpegLocator
         }
 
         // 2. Every directory on PATH.
-        var pathEnv = Environment.GetEnvironmentVariable("PATH");
+        string? pathEnv = Environment.GetEnvironmentVariable("PATH");
         if (!string.IsNullOrWhiteSpace(pathEnv))
         {
             foreach (var dir in pathEnv.Split(Path.PathSeparator))
@@ -52,10 +52,10 @@ public static class FfmpegLocator
         }
 
         // 3. WinGet shared FFmpeg packages (probed because winget links may not put bin/ on PATH).
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (!string.IsNullOrWhiteSpace(localAppData))
         {
-            var wingetRoot = Path.Combine(localAppData, "Microsoft", "WinGet", "Packages");
+            string wingetRoot = Path.Combine(localAppData, "Microsoft", "WinGet", "Packages");
             foreach (var candidate in EnumerateWingetSharedFfmpeg(wingetRoot))
             {
                 yield return candidate;
@@ -90,7 +90,7 @@ public static class FfmpegLocator
             yield break;
         }
 
-        foreach (var packageDir in packageDirs)
+        foreach (string packageDir in packageDirs)
         {
             string[] versionDirs;
             try

@@ -15,7 +15,7 @@ internal sealed class HotKeyWindow : NativeWindow, IDisposable
         CreateHandle(new CreateParams());
 
         const KeyModifiers modifiers = KeyModifiers.Control | KeyModifiers.Shift | KeyModifiers.Alt;
-        var registered = RegisterHotKey(Handle, HotKeyId, (uint)modifiers, (uint)Keys.S);
+        bool registered = RegisterHotKey(Handle, HotKeyId, (uint)modifiers, (uint)Keys.S);
         if (!registered)
         {
             throw new InvalidOperationException("Failed to register Ctrl+Shift+Alt+S global hotkey.");

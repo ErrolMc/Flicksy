@@ -41,8 +41,11 @@ public sealed partial class FFmpegMediaDecoder : IMediaDecoder
 
     public FFmpegMediaDecoder(string path, int targetSampleRate, System.Drawing.Size? targetVideoSize = null)
     {
-        if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Path is required.", nameof(path));
-        if (targetSampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(targetSampleRate));
+        if (string.IsNullOrWhiteSpace(path)) 
+            throw new ArgumentException("Path is required.", nameof(path));
+
+        if (targetSampleRate <= 0) 
+            throw new ArgumentOutOfRangeException(nameof(targetSampleRate));
 
         _targetSampleRate = targetSampleRate;
 
@@ -67,36 +70,44 @@ public sealed partial class FFmpegMediaDecoder : IMediaDecoder
         var duration = TimeSpan.Zero;
         if (_file.HasVideo)
         {
-            var info = _file.Video.Info;
+            VideoStreamInfo info = _file.Video.Info;
             VideoWidth = info.FrameSize.Width;
             VideoHeight = info.FrameSize.Height;
-            if (info.Duration > duration) duration = info.Duration;
+            if (info.Duration > duration) 
+                duration = info.Duration;
         }
         if (_file.HasAudio)
         {
             // Audio-stream setup (source rate + resampler ratio) lives in the audio partial.
-            var audioDuration = InitAudioStream();
-            if (audioDuration > duration) duration = audioDuration;
+            TimeSpan audioDuration = InitAudioStream();
+            if (audioDuration > duration) 
+                duration = audioDuration;
         }
         Duration = duration;
     }
 
     public VideoFrame? GetVideoFrameAt(TimeSpan time)
     {
-        if (_disposed || !HasVideo) return null;
-        if (time < TimeSpan.Zero) time = TimeSpan.Zero;
-        if (Duration > TimeSpan.Zero && time > Duration) return null;
+        if (_disposed || !HasVideo) 
+            return null;
+
+        if (time < TimeSpan.Zero) 
+            time = TimeSpan.Zero;
+
+        if (Duration > TimeSpan.Zero && time > Duration) 
+            return null;
 
         lock (_gate)
         {
-            if (_file is null) return null;
+            if (_file is null) 
+                return null;
 
             try
             {
-                var image = _file.Video.GetFrame(time);
-                var data = image.Data;
-                var len = data.Length;
-                var buf = ArrayPool<byte>.Shared.Rent(len);
+                ImageData image = _file.Video.GetFrame(time);
+                Span<byte> data = image.Data;
+                int len = data.Length;
+                byte[] buf = ArrayPool<byte>.Shared.Rent(len);
                 data.CopyTo(buf);
                 return new VideoFrame(
                     buf, len,
@@ -115,12 +126,21 @@ public sealed partial class FFmpegMediaDecoder : IMediaDecoder
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+        
         _disposed = true;
 
         lock (_gate)
         {
-            try { _file?.Dispose(); } catch { /* ignore */ }
+            try 
+            { 
+                _file?.Dispose(); 
+            } 
+            catch 
+            { 
+                /* ignore */ 
+            }
             _file = null;
         }
     }

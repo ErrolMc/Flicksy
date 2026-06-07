@@ -31,7 +31,7 @@ public sealed class CompositeCommand : IUndoableCommand
 
     public void Redo()
     {
-        var token = _selectionScope?.Capture();
+        object? token = _selectionScope?.Capture();
         foreach (var child in _children)
         {
             child.Redo();
@@ -41,7 +41,7 @@ public sealed class CompositeCommand : IUndoableCommand
 
     public void Undo()
     {
-        var token = _selectionScope?.Capture();
+        object? token = _selectionScope?.Capture();
         for (var i = _children.Count - 1; i >= 0; i--)
         {
             _children[i].Undo();

@@ -96,7 +96,7 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
     {
         get
         {
-            var target = _target;
+            WriteableBitmap? target = _target;
             int width = ProjectSettings.ResolutionWidth;
             return target is not null && width > 0
                 ? (double)target.PixelWidth / width
@@ -157,11 +157,12 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
     {
         try
         {
-            var target = EnsureTarget();
-            if (target is null) return;
+            WriteableBitmap? target = EnsureTarget();
+            if (target is null) 
+                return;
 
             int frame = _transport.Playhead;
-            var frames = PlaybackFrames;
+            IPlaybackFrameSource? frames = PlaybackFrames;
             if (frames is not null)
             {
                 // Playback: composite from the off-thread pump's pre-decoded frames (ADR 0009).

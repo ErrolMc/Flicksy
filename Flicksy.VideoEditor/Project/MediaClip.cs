@@ -112,9 +112,13 @@ public partial class MediaClip : Clip
 
     partial void OnSourceChanged(MediaSource? value)
     {
-        if (_subscribedSource is not null) _subscribedSource.PropertyChanged -= OnSourcePropertyChanged;
+        if (_subscribedSource is not null) 
+            _subscribedSource.PropertyChanged -= OnSourcePropertyChanged;
+
         _subscribedSource = value;
-        if (_subscribedSource is not null) _subscribedSource.PropertyChanged += OnSourcePropertyChanged;
+        if (_subscribedSource is not null) 
+            _subscribedSource.PropertyChanged += OnSourcePropertyChanged;
+
         OnPropertyChanged(nameof(IsBroken));
         OnPropertyChanged(nameof(DisplayName));
     }
@@ -146,13 +150,13 @@ public partial class MediaClip : Clip
     {
         get
         {
-            var sourceSeconds = (SourceOut - SourceIn).TotalSeconds;
+            double sourceSeconds = (SourceOut - SourceIn).TotalSeconds;
             if (Speed <= 0 || sourceSeconds <= 0 || Framerate <= 0)
             {
                 return 0;
             }
 
-            var timelineSeconds = sourceSeconds / Speed;
+            double timelineSeconds = sourceSeconds / Speed;
             return (int)Math.Round(timelineSeconds * Framerate);
         }
     }
@@ -171,7 +175,9 @@ public partial class MediaClip : Clip
     {
         get
         {
-            if (!string.IsNullOrEmpty(Name)) return Name;
+            if (!string.IsNullOrEmpty(Name)) 
+                return Name;
+
             return AutoDerivedDisplayName;
         }
     }
@@ -182,7 +188,7 @@ public partial class MediaClip : Clip
     {
         get
         {
-            var sourceName = Source?.DisplayName ?? string.Empty;
+            string sourceName = Source?.DisplayName ?? string.Empty;
             return Streams == ClipStreams.Audio && Source is { HasVideo: true }
                 ? $"{sourceName} (Audio)"
                 : sourceName;
@@ -211,9 +217,10 @@ public partial class MediaClip : Clip
     /// </summary>
     public void CommitRename()
     {
-        if (!IsEditing) return;
+        if (!IsEditing) 
+            return;
 
-        var trimmed = (EditingName ?? string.Empty).Trim();
+        string trimmed = (EditingName ?? string.Empty).Trim();
         Name = string.IsNullOrEmpty(trimmed) || string.Equals(trimmed, AutoDerivedDisplayName, StringComparison.Ordinal)
             ? string.Empty
             : trimmed;
@@ -243,8 +250,12 @@ public partial class MediaClip : Clip
     {
         get
         {
-            if (Source is null || Source.IsMissing) return true;
-            if (SourceOut > Source.Duration) return true;
+            if (Source is null || Source.IsMissing) 
+                return true;
+
+            if (SourceOut > Source.Duration)
+                return true;
+
             return (Streams, Source.HasVideo, Source.HasAudio) switch
             {
                 (ClipStreams.Both, true, true) => false,

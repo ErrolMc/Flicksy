@@ -45,7 +45,7 @@ public partial class PreSnipOverlayWindow : Window
         Height = bounds.Height;
 
         _backgroundBitmap = new Bitmap(bounds.Width, bounds.Height);
-        using (var graphics = Graphics.FromImage(_backgroundBitmap))
+        using (Graphics graphics = Graphics.FromImage(_backgroundBitmap))
         {
             graphics.CopyFromScreen(bounds.Location, System.Drawing.Point.Empty, bounds.Size);
         }
@@ -106,8 +106,8 @@ public partial class PreSnipOverlayWindow : Window
             return;
         }
 
-        var current = ClampToCanvas(e.GetPosition(OverlayCanvas));
-        var rawSelection = CreateRect(_selectionStart, current);
+        WpfPoint current = ClampToCanvas(e.GetPosition(OverlayCanvas));
+        Rect rawSelection = CreateRect(_selectionStart, current);
         _selectionRect = _isSnipMode
             ? rawSelection
             : NormalizeRecordingSelectionRect(rawSelection);
@@ -125,7 +125,7 @@ public partial class PreSnipOverlayWindow : Window
         Mouse.Capture(null);
         UpdateSelectionVisuals();
 
-        var selection = GetSelectionRectangle();
+        DrawingRectangle selection = GetSelectionRectangle();
         if (selection.Width < 2 || selection.Height < 2)
         {
             return;
@@ -134,7 +134,7 @@ public partial class PreSnipOverlayWindow : Window
         if (_isSnipMode)
         {
             var captured = new Bitmap(selection.Width, selection.Height);
-            using (var graphics = Graphics.FromImage(captured))
+            using (Graphics graphics = Graphics.FromImage(captured))
             {
                 graphics.DrawImage(
                     _backgroundBitmap,
@@ -178,8 +178,8 @@ public partial class PreSnipOverlayWindow : Window
 
     private void UpdateSelectionVisuals()
     {
-        var canvasWidth = OverlayCanvas.ActualWidth;
-        var canvasHeight = OverlayCanvas.ActualHeight;
+        double canvasWidth = OverlayCanvas.ActualWidth;
+        double canvasHeight = OverlayCanvas.ActualHeight;
         if (canvasWidth <= 0 || canvasHeight <= 0)
         {
             return;
@@ -195,7 +195,7 @@ public partial class PreSnipOverlayWindow : Window
             return;
         }
 
-        var rect = _selectionRect;
+        Rect rect = _selectionRect;
         SetCanvasRect(TopShade, 0, 0, canvasWidth, rect.Y);
         SetCanvasRect(LeftShade, 0, rect.Y, rect.X, rect.Height);
         SetCanvasRect(RightShade, rect.Right, rect.Y, canvasWidth - rect.Right, rect.Height);
@@ -212,20 +212,20 @@ public partial class PreSnipOverlayWindow : Window
 
     private DrawingRectangle GetClampedSelectionRectangle(bool useCeilingForSize, bool requireEvenSize)
     {
-        var maxWidth = _backgroundBitmap.Width;
-        var maxHeight = _backgroundBitmap.Height;
-        var x = Math.Clamp((int)Math.Floor(_selectionRect.X), 0, Math.Max(maxWidth - 1, 0));
-        var y = Math.Clamp((int)Math.Floor(_selectionRect.Y), 0, Math.Max(maxHeight - 1, 0));
+        int maxWidth = _backgroundBitmap.Width;
+        int maxHeight = _backgroundBitmap.Height;
+        int x = Math.Clamp((int)Math.Floor(_selectionRect.X), 0, Math.Max(maxWidth - 1, 0));
+        int y = Math.Clamp((int)Math.Floor(_selectionRect.Y), 0, Math.Max(maxHeight - 1, 0));
 
-        var rawWidth = useCeilingForSize
+        int rawWidth = useCeilingForSize
             ? (int)Math.Ceiling(_selectionRect.Width)
             : (int)Math.Floor(_selectionRect.Width);
-        var rawHeight = useCeilingForSize
+        int rawHeight = useCeilingForSize
             ? (int)Math.Ceiling(_selectionRect.Height)
             : (int)Math.Floor(_selectionRect.Height);
 
-        var width = Math.Clamp(rawWidth, 0, maxWidth - x);
-        var height = Math.Clamp(rawHeight, 0, maxHeight - y);
+        int width = Math.Clamp(rawWidth, 0, maxWidth - x);
+        int height = Math.Clamp(rawHeight, 0, maxHeight - y);
 
         if (requireEvenSize)
         {
@@ -238,10 +238,10 @@ public partial class PreSnipOverlayWindow : Window
 
     private static Rect NormalizeRecordingSelectionRect(Rect rect)
     {
-        var x = Math.Floor(rect.X);
-        var y = Math.Floor(rect.Y);
-        var width = Math.Floor(rect.Width);
-        var height = Math.Floor(rect.Height);
+        double x = Math.Floor(rect.X);
+        double y = Math.Floor(rect.Y);
+        double width = Math.Floor(rect.Width);
+        double height = Math.Floor(rect.Height);
 
         width = Math.Max(0, width - (width % 2));
         height = Math.Max(0, height - (height % 2));
@@ -256,7 +256,7 @@ public partial class PreSnipOverlayWindow : Window
             return false;
         }
 
-        var current = dependencyObject;
+        DependencyObject current = dependencyObject;
         while (current is not null)
         {
             if (current is Border border && border.Name == "MenuBorder")
@@ -272,17 +272,17 @@ public partial class PreSnipOverlayWindow : Window
 
     private WpfPoint ClampToCanvas(WpfPoint point)
     {
-        var x = Math.Clamp(point.X, 0, OverlayCanvas.ActualWidth);
-        var y = Math.Clamp(point.Y, 0, OverlayCanvas.ActualHeight);
+        double x = Math.Clamp(point.X, 0, OverlayCanvas.ActualWidth);
+        double y = Math.Clamp(point.Y, 0, OverlayCanvas.ActualHeight);
         return new WpfPoint(x, y);
     }
 
     private static Rect CreateRect(WpfPoint a, WpfPoint b)
     {
-        var left = Math.Min(a.X, b.X);
-        var top = Math.Min(a.Y, b.Y);
-        var width = Math.Abs(b.X - a.X);
-        var height = Math.Abs(b.Y - a.Y);
+        double left = Math.Min(a.X, b.X);
+        double top = Math.Min(a.Y, b.Y);
+        double width = Math.Abs(b.X - a.X);
+        double height = Math.Abs(b.Y - a.Y);
         return new Rect(left, top, width, height);
     }
 
@@ -296,10 +296,10 @@ public partial class PreSnipOverlayWindow : Window
 
     private static BitmapSource CreateBitmapSource(Bitmap bitmap)
     {
-        var hBitmap = bitmap.GetHbitmap();
+        nint hBitmap = bitmap.GetHbitmap();
         try
         {
-            var source = Imaging.CreateBitmapSourceFromHBitmap(
+            BitmapSource source = Imaging.CreateBitmapSourceFromHBitmap(
                 hBitmap,
                 IntPtr.Zero,
                 Int32Rect.Empty,

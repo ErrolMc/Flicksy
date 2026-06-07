@@ -64,14 +64,14 @@ public partial class MediaSource : ObservableObject
 
     public static MediaSource Probe(string path)
     {
-        var fullPath = Path.GetFullPath(path);
+        string fullPath = Path.GetFullPath(path);
         var options = new MediaOptions
         {
             StreamsToLoad = MediaMode.AudioVideo,
             VideoPixelFormat = ImagePixelFormat.Bgra32,
         };
 
-        using var file = MediaFile.Open(fullPath, options);
+        using MediaFile file = MediaFile.Open(fullPath, options);
 
         var source = new MediaSource
         {
@@ -85,19 +85,21 @@ public partial class MediaSource : ObservableObject
 
         if (file.HasVideo)
         {
-            var info = file.Video.Info;
+            VideoStreamInfo info = file.Video.Info;
             source.Width = info.FrameSize.Width;
             source.Height = info.FrameSize.Height;
             source.SourceFramerate = info.AvgFrameRate;
-            if (info.Duration > duration) duration = info.Duration;
+            if (info.Duration > duration) 
+                duration = info.Duration;
         }
 
         if (file.HasAudio)
         {
-            var info = file.Audio.Info;
+            AudioStreamInfo info = file.Audio.Info;
             source.SampleRate = info.SampleRate;
             source.ChannelCount = info.NumChannels;
-            if (info.Duration > duration) duration = info.Duration;
+            if (info.Duration > duration) 
+                duration = info.Duration;
         }
 
         source.Duration = duration;

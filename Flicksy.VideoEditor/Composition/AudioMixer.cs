@@ -32,27 +32,32 @@ public sealed class AudioMixer : IAudioMixer
         int sampleRate = project.Settings.AudioSampleRate;
         int framerate = project.Settings.Framerate;
         int stereoFrames = framerate > 0 ? sampleRate / framerate : 0;
-        var output = new float[stereoFrames * 2];
+        float[] output = new float[stereoFrames * 2];
 
-        if (stereoFrames == 0) return new AudioBuffer(output, sampleRate);
+        if (stereoFrames == 0) 
+            return new AudioBuffer(output, sampleRate);
 
         lock (_gate)
         {
             // A pull arriving after disposal (render thread outliving Stop) gets silence.
-            if (_disposed) return new AudioBuffer(output, sampleRate);
+            if (_disposed) 
+                return new AudioBuffer(output, sampleRate);
 
-            var layers = CompositionPlanner.PlanFrame(project, frame);
+            IReadOnlyList<CompositionLayer> layers = CompositionPlanner.PlanFrame(project, frame);
             // Scratch buffer reused across all audio-eligible layers — each clip's samples
             // get scaled by Volume and accumulated into `output`.
-            var scratch = new float[stereoFrames * 2];
+            float[] scratch = new float[stereoFrames * 2];
 
-            foreach (var layer in layers)
+            foreach (CompositionLayer layer in layers)
             {
-                if (!IsAudibleLayer(layer)) continue;
-                var mediaClip = (MediaClip)layer.Clip;
+                if (!IsAudibleLayer(layer)) 
+                    continue;
 
-                var decoder = _decoders.GetOrCreate(mediaClip, sampleRate);
-                if (decoder is null || !decoder.HasAudio) continue;
+                MediaClip mediaClip = (MediaClip)layer.Clip;
+
+                IMediaDecoder? decoder = _decoders.GetOrCreate(mediaClip, sampleRate);
+                if (decoder is null || !decoder.HasAudio) 
+                    continue;
 
                 decoder.GetAudioSamplesAt(layer.SourceTime, scratch);
 
@@ -71,7 +76,9 @@ public sealed class AudioMixer : IAudioMixer
     {
         lock (_gate)
         {
-            if (_disposed) return;
+            if (_disposed) 
+                return;
+
             _disposed = true;
             _decoders.Dispose();
         }
@@ -79,11 +86,21 @@ public sealed class AudioMixer : IAudioMixer
 
     private static bool IsAudibleLayer(CompositionLayer layer)
     {
-        if (layer.Track.Kind == TrackKind.Overlay) return false;
-        if (layer.Track.Muted) return false;
-        if (layer.Clip is not MediaClip mediaClip) return false;
-        if (mediaClip.Streams != ClipStreams.Audio && mediaClip.Streams != ClipStreams.Both) return false;
-        if (mediaClip.IsBroken) return false;
+        if (layer.Track.Kind == TrackKind.Overlay) 
+            return false;
+
+        if (layer.Track.Muted) 
+            return false;
+
+        if (layer.Clip is not MediaClip mediaClip) 
+            return false;
+
+        if (mediaClip.Streams != ClipStreams.Audio && mediaClip.Streams != ClipStreams.Both) 
+            return false;
+
+        if (mediaClip.IsBroken) 
+            return false;
+
         return true;
     }
 }

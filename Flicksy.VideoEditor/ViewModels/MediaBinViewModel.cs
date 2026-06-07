@@ -91,7 +91,8 @@ public sealed partial class MediaBinViewModel : ObservableObject
             Filter = DialogFilter,
             Title = "Import media",
         };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true) 
+            return;
 
         foreach (var path in dialog.FileNames)
         {
@@ -103,9 +104,13 @@ public sealed partial class MediaBinViewModel : ObservableObject
     {
         foreach (var path in paths)
         {
-            if (string.IsNullOrWhiteSpace(path)) continue;
-            var ext = Path.GetExtension(path);
-            if (!AcceptedExtensions.Contains(ext)) continue;
+            if (string.IsNullOrWhiteSpace(path)) 
+                continue;
+
+            string? ext = Path.GetExtension(path);
+            if (!AcceptedExtensions.Contains(ext)) 
+                continue;
+
             TryImportFile(path);
         }
     }
@@ -146,8 +151,9 @@ public sealed partial class MediaBinViewModel : ObservableObject
     [RelayCommand]
     private void Reveal(MediaSourceViewModel? entry)
     {
-        var path = entry?.Source.SourcePath;
-        if (string.IsNullOrWhiteSpace(path)) return;
+        string? path = entry?.Source.SourcePath;
+        if (string.IsNullOrWhiteSpace(path)) 
+            return;
 
         try
         {
@@ -167,12 +173,15 @@ public sealed partial class MediaBinViewModel : ObservableObject
     [RelayCommand]
     private void BeginRename(MediaSourceViewModel? entry)
     {
-        if (entry is null) return;
-        if (entry.IsEditing) return;
+        if (entry is null) 
+            return;
+
+        if (entry.IsEditing) 
+            return;
 
         // Single-editor — commit any in-progress rename on a different entry first so a
         // half-finished name isn't silently dropped when focus shifts.
-        foreach (var other in MediaSources)
+        foreach (MediaSourceViewModel other in MediaSources)
         {
             if (other != entry && other.IsEditing)
             {
@@ -187,12 +196,15 @@ public sealed partial class MediaBinViewModel : ObservableObject
     [RelayCommand]
     private void CommitRename(MediaSourceViewModel? entry)
     {
-        if (entry is null) return;
+        if (entry is null) 
+            return;
+
         // Guards against the double-fire path: Enter sets IsEditing=false, which collapses
         // the TextBox, which fires LostFocus, which calls CommitRename a second time.
-        if (!entry.IsEditing) return;
+        if (!entry.IsEditing) 
+            return;
 
-        var newName = (entry.EditingName ?? string.Empty).Trim();
+        string newName = (entry.EditingName ?? string.Empty).Trim();
         if (!string.IsNullOrEmpty(newName))
         {
             entry.Source.DisplayName = newName;
@@ -205,15 +217,19 @@ public sealed partial class MediaBinViewModel : ObservableObject
     [RelayCommand]
     private void CancelRename(MediaSourceViewModel? entry)
     {
-        if (entry is null) return;
+        if (entry is null) 
+            return;
+
         entry.IsEditing = false;
     }
 
     [RelayCommand]
     private void Relocate(MediaSourceViewModel? entry)
     {
-        if (entry is null) return;
-        var source = entry.Source;
+        if (entry is null) 
+            return;
+
+        MediaSource source = entry.Source;
 
         var dialog = new OpenFileDialog
         {
@@ -221,7 +237,9 @@ public sealed partial class MediaBinViewModel : ObservableObject
             Title = $"Relocate \"{source.DisplayName}\"",
             FileName = Path.GetFileName(source.SourcePath),
         };
-        if (dialog.ShowDialog() != true) return;
+
+        if (dialog.ShowDialog() != true) 
+            return;
 
         string newPath;
         try
@@ -259,19 +277,21 @@ public sealed partial class MediaBinViewModel : ObservableObject
 
         if (probe.Duration != source.Duration)
         {
-            var result = MessageBox.Show(
+            MessageBoxResult result = MessageBox.Show(
                 $"Duration changed from {FormatDuration(source.Duration)} to {FormatDuration(probe.Duration)}. " +
                 "Clips that reference this source may now extend past the new end and need trimming.\n\nApply anyway?",
                 "Duration changed",
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Question);
-            if (result != MessageBoxResult.OK) return;
+
+            if (result != MessageBoxResult.OK) 
+                return;
         }
 
         // Apply onto the existing MediaSource instance — Id is preserved, so every clip
         // that referenced this source via MediaSourceId stays linked. Mutations propagate
         // via [ObservableProperty] change notifications.
-        var oldAutoName = Path.GetFileNameWithoutExtension(source.SourcePath);
+        string? oldAutoName = Path.GetFileNameWithoutExtension(source.SourcePath);
         source.SourcePath = newPath;
         // Smart auto-name: if the user never renamed (DisplayName still matches what import
         // would have generated from the old path), update it to match the new file. If they
@@ -308,9 +328,9 @@ public sealed partial class MediaBinViewModel : ObservableObject
         // the cascade can splice both the clip and any transition touching it. Track has no
         // back-reference from Clip, so we walk Project.Tracks rather than the clip itself.
         var referencing = new List<(Track Track, MediaClip Clip)>();
-        foreach (var track in _project.Tracks)
+        foreach (Track track in _project.Tracks)
         {
-            foreach (var clip in track.Clips)
+            foreach (Clip clip in track.Clips)
             {
                 if (clip is MediaClip mc && mc.MediaSourceId == source.Id)
                 {
@@ -321,22 +341,24 @@ public sealed partial class MediaBinViewModel : ObservableObject
 
         if (referencing.Count > 0)
         {
-            var result = MessageBox.Show(
+            MessageBoxResult result = MessageBox.Show(
                 $"\"{source.DisplayName}\" is used by {referencing.Count} clip(s) on the timeline.\n\n" +
                 "Remove the source and delete those clips?",
                 "Remove source",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
-            if (result != MessageBoxResult.Yes) return;
+
+            if (result != MessageBoxResult.Yes) 
+                return;
         }
 
         // Cascade: remove each referencing clip plus any transitions on its track that
         // touched it. A transition that referenced two cascaded clips disappears on the
         // first pass — the second pass simply finds nothing.
-        foreach (var (track, clip) in referencing)
+        foreach ((Track track, MediaClip clip) in referencing)
         {
             track.Clips.Remove(clip);
-            var clipId = clip.Id;
+            Guid clipId = clip.Id;
             track.Transitions.RemoveAll(t => t.LeftClipId == clipId || t.RightClipId == clipId);
         }
 
@@ -358,25 +380,34 @@ public sealed partial class MediaBinViewModel : ObservableObject
     /// </summary>
     public void RefreshMissingState()
     {
-        var snapshot = _project.MediaSources.ToArray();
-        if (snapshot.Length == 0) return;
+        MediaSource[] snapshot = _project.MediaSources.ToArray();
+        if (snapshot.Length == 0) 
+            return;
 
         _ = Task.Run(() => ScanMissingState(snapshot));
     }
 
     private void ScanMissingState(IReadOnlyList<MediaSource> sources)
     {
-        foreach (var source in sources)
+        foreach (MediaSource source in sources)
         {
-            var path = source.SourcePath;
-            if (string.IsNullOrWhiteSpace(path)) continue;
+            string path = source.SourcePath;
+            if (string.IsNullOrWhiteSpace(path)) 
+                continue;
 
             bool exists;
-            try { exists = File.Exists(path); }
-            catch { exists = false; } // malformed path / IO error — treat as missing
+            try 
+            { 
+                exists = File.Exists(path); 
+            }
+            catch 
+            { 
+                exists = false;  // malformed path / IO error — treat as missing
+            } 
 
             // No-op if state already matches reality (the common case on every alt-tab).
-            if (exists == !source.IsMissing) continue;
+            if (exists == !source.IsMissing) 
+                continue;
 
             if (!exists)
             {
@@ -399,8 +430,14 @@ public sealed partial class MediaBinViewModel : ObservableObject
                 // on probe-throw: the file exists at the path but can't be opened, so
                 // leave the missing flag set rather than corrupt the metadata.
                 MediaSource probe;
-                try { probe = MediaSource.Probe(path); }
-                catch { continue; }
+                try 
+                { 
+                    probe = MediaSource.Probe(path); 
+                }
+                catch 
+                { 
+                    continue; 
+                }
 
                 _dispatcher.InvokeAsync(() => ApplyReprobe(source, probe));
             }
@@ -462,9 +499,13 @@ public sealed partial class MediaBinViewModel : ObservableObject
 
     private void RemoveWrapper(MediaSource source)
     {
-        if (!_wrappersById.Remove(source.Id, out var wrapper)) return;
+        if (!_wrappersById.Remove(source.Id, out var wrapper)) 
+            return;
+
         MediaSources.Remove(wrapper);
-        if (SelectedSource == wrapper) SelectedSource = null;
+        if (SelectedSource == wrapper) 
+            SelectedSource = null;
+
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(HasEntries));
     }
@@ -477,7 +518,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
     // previously-missing source comes back.
     private void IssueThumbnail(MediaSourceViewModel wrapper)
     {
-        var source = wrapper.Source;
+        MediaSource source = wrapper.Source;
         wrapper.Thumbnail = null;
         if (source.IsMissing) return;
         if (source.HasAudio && !source.HasVideo)
@@ -498,7 +539,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
 
     private async Task ProcessThumbnailsAsync()
     {
-        await foreach (var source in _thumbnailQueue.Reader.ReadAllAsync().ConfigureAwait(false))
+        await foreach (MediaSource source in _thumbnailQueue.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             ImageSource? thumb;
             try
@@ -512,7 +553,8 @@ public sealed partial class MediaBinViewModel : ObservableObject
                 continue;
             }
 
-            if (thumb is null) continue;
+            if (thumb is null) 
+                continue;
 
             _ = _dispatcher.InvokeAsync(() =>
             {
@@ -532,19 +574,22 @@ public sealed partial class MediaBinViewModel : ObservableObject
             VideoPixelFormat = ImagePixelFormat.Bgra32,
         };
 
-        using var file = MediaFile.Open(path, options);
-        if (!file.HasVideo) return null;
+        using MediaFile file = MediaFile.Open(path, options);
+        if (!file.HasVideo) 
+            return null;
 
-        var duration = file.Video.Info.Duration;
-        var seekTo = duration > TimeSpan.Zero
+        TimeSpan duration = file.Video.Info.Duration;
+        TimeSpan seekTo = duration > TimeSpan.Zero
             ? TimeSpan.FromTicks(duration.Ticks / 2)
             : TimeSpan.Zero;
 
-        if (!file.Video.TryGetFrame(seekTo, out var frame)) return null;
+        if (!file.Video.TryGetFrame(seekTo, out var frame)) 
+            return null;
 
-        var width = frame.ImageSize.Width;
-        var height = frame.ImageSize.Height;
-        if (width <= 0 || height <= 0) return null;
+        int width = frame.ImageSize.Width;
+        int height = frame.ImageSize.Height;
+        if (width <= 0 || height <= 0) 
+            return null;
 
         // BitmapSource.Create copies the pixel buffer internally — safe to dispose
         // MediaFile after this call without dangling pointers.
@@ -558,7 +603,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
             stride: frame.Stride);
 
         const double TargetWidth = 200.0;
-        var scale = TargetWidth / width;
+        double scale = TargetWidth / width;
         var scaled = new TransformedBitmap(source, new ScaleTransform(scale, scale));
         scaled.Freeze();
         return scaled;
@@ -567,7 +612,14 @@ public sealed partial class MediaBinViewModel : ObservableObject
     private void ShowImportError(string path, Exception ex)
     {
         var fileName = string.Empty;
-        try { fileName = Path.GetFileName(path); } catch { fileName = path; }
+        try 
+        { 
+            fileName = Path.GetFileName(path); 
+        } 
+        catch 
+        { 
+            fileName = path; 
+        }
 
         MessageBox.Show(
             $"Couldn't import {fileName}:\n\n{ex.Message}",
@@ -579,7 +631,14 @@ public sealed partial class MediaBinViewModel : ObservableObject
     private void ShowRelocateError(string path, Exception ex)
     {
         var fileName = string.Empty;
-        try { fileName = Path.GetFileName(path); } catch { fileName = path; }
+        try 
+        { 
+            fileName = Path.GetFileName(path); 
+        } 
+        catch 
+        { 
+            fileName = path; 
+        }
 
         MessageBox.Show(
             $"Couldn't open {fileName}:\n\n{ex.Message}",

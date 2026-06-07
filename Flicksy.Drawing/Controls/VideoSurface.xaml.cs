@@ -34,7 +34,7 @@ public partial class VideoSurface : UserControl
 
     private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        var surface = (VideoSurface)d;
+        VideoSurface surface = (VideoSurface)d;
 
         if (e.OldValue is IVideoPlayer oldPlayer)
         {

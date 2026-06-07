@@ -67,7 +67,7 @@ public partial class DrawingViewModel : ObservableObject
             return;
         }
 
-        var index = Items.IndexOf(item);
+        int index = Items.IndexOf(item);
         if (index < 0 || index >= Items.Count - 1)
         {
             return;
@@ -85,7 +85,7 @@ public partial class DrawingViewModel : ObservableObject
             return;
         }
 
-        var index = Items.IndexOf(item);
+        int index = Items.IndexOf(item);
         if (index <= 0)
         {
             return;
@@ -196,9 +196,9 @@ public partial class DrawingViewModel : ObservableObject
         item.IsEditing = false;
         EditingTextItem = null;
 
-        var wasNewItem = _editIsNewItem && ReferenceEquals(_editOriginalItem, item);
-        var originalText = ReferenceEquals(_editOriginalItem, item) ? _editOriginalText : item.Text;
-        var originalIndex = _editOriginalIndex;
+        bool wasNewItem = _editIsNewItem && ReferenceEquals(_editOriginalItem, item);
+        string originalText = ReferenceEquals(_editOriginalItem, item) ? _editOriginalText : item.Text;
+        int originalIndex = _editOriginalIndex;
 
         // Clear the captured session state before pushing the command so a re-entrant
         // BeginEditText (e.g. from inside the redo path) doesn't see stale data.
@@ -241,7 +241,7 @@ public partial class DrawingViewModel : ObservableObject
             return;
         }
 
-        var before = _styleEditBefore;
+        TextStyleSnapshot before = _styleEditBefore;
         _styleEditItem = null;
         _styleEditBefore = default;
 
@@ -283,14 +283,14 @@ public partial class DrawingViewModel : ObservableObject
             return false;
         }
 
-        var index = Items.IndexOf(item);
+        int index = Items.IndexOf(item);
         if (index < 0)
         {
             return false;
         }
 
         // OnItemsChanged will null out SelectedItem when the collection no longer contains it.
-        var removed = Items.Remove(item);
+        bool removed = Items.Remove(item);
         if (removed)
         {
             History.Push(new RemoveItemCommand(this, item, index));

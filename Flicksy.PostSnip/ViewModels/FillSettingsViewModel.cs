@@ -49,8 +49,8 @@ public partial class FillSettingsViewModel : ObservableObject
                 return SelectedColor.Brush;
             }
 
-            var c = solid.Color;
-            var alpha = (byte)Math.Clamp((int)Math.Round(c.A * Opacity), 0, 255);
+            Color c = solid.Color;
+            byte alpha = (byte)Math.Clamp((int)Math.Round(c.A * Opacity), 0, 255);
             var brush = new SolidColorBrush(Color.FromArgb(alpha, c.R, c.G, c.B));
             brush.Freeze();
             return brush;
@@ -88,7 +88,7 @@ public partial class FillSettingsViewModel : ObservableObject
     {
         if (brush is null)
         {
-            var noneOption = Colors.FirstOrDefault(o => o.IsNone);
+            FillColorOption? noneOption = Colors.FirstOrDefault(o => o.IsNone);
             if (noneOption is not null && !ReferenceEquals(SelectedColor, noneOption))
             {
                 SelectColor(noneOption);
@@ -101,14 +101,14 @@ public partial class FillSettingsViewModel : ObservableObject
             return;
         }
 
-        var target = solid.Color;
-        foreach (var option in Colors)
+        Color target = solid.Color;
+        foreach (FillColorOption option in Colors)
         {
             if (option.IsNone || option.Brush is not SolidColorBrush swatch)
             {
                 continue;
             }
-            var s = swatch.Color;
+            Color s = swatch.Color;
             if (s.R != target.R || s.G != target.G || s.B != target.B)
             {
                 continue;
@@ -136,7 +136,7 @@ public partial class FillSettingsViewModel : ObservableObject
             "#F48FB1", "#FFAB91", "#FFF59D", "#A5D6A7", "#81D4FA", "#B39DDB",
         };
 
-        foreach (var hex in hexes)
+        foreach (string hex in hexes)
         {
             yield return new FillColorOption(CreateBrush(hex));
         }
@@ -144,7 +144,7 @@ public partial class FillSettingsViewModel : ObservableObject
 
     private static Brush CreateBrush(string hex)
     {
-        var color = (Color)ColorConverter.ConvertFromString(hex);
+        Color color = (Color)ColorConverter.ConvertFromString(hex);
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;

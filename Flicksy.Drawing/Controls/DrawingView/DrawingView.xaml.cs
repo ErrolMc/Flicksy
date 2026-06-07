@@ -119,15 +119,15 @@ public partial class DrawingView : UserControl, IDrawingSurface, IPenConfig, ISh
 
     private bool TryGetPoint(MouseEventArgs e, bool clampToBounds, out Point point)
     {
-        var x = ActualWidth;
-        var y = ActualHeight;
+        double x = ActualWidth;
+        double y = ActualHeight;
         if (x <= 0 || y <= 0)
         {
             point = default;
             return false;
         }
 
-        var position = e.GetPosition(this);
+        Point position = e.GetPosition(this);
         if (!clampToBounds && (position.X < 0 || position.Y < 0 || position.X > x || position.Y > y))
         {
             point = default;

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Flicksy.Drawing.Media;
+using Flicksy.Drawing.Source;
 using Flicksy.VideoEditor.Project;
 using SkiaSharp;
 
@@ -57,7 +58,8 @@ public sealed class SkiaCompositor : ICompositor
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(target);
-        if (_disposed) throw new ObjectDisposedException(nameof(SkiaCompositor));
+        if (_disposed) 
+            throw new ObjectDisposedException(nameof(SkiaCompositor));
 
         int width = project.Settings.ResolutionWidth;
         int height = project.Settings.ResolutionHeight;
@@ -81,7 +83,7 @@ public sealed class SkiaCompositor : ICompositor
 
         // Decode source: the caller's prefetch provider during playback, else the lazily-created
         // synchronous one (decodes on this thread — the canonical export/scrub/static path).
-        var activeFrames = frames ?? (_defaultFrames ??= new DecodingFrameProvider(sampleRate));
+        IClipFrameProvider activeFrames = frames ?? (_defaultFrames ??= new DecodingFrameProvider(sampleRate));
 
         target.Lock();
         try
@@ -107,11 +109,13 @@ public sealed class SkiaCompositor : ICompositor
 
             // Use the snapshot the prefetch worker already planned (so we never re-walk a project
             // the UI thread may be mutating mid-playback); plan ourselves on the synchronous path.
-            var layers = plannedLayers ?? CompositionPlanner.PlanFrame(project, frame);
-            foreach (var layer in layers)
+            IReadOnlyList<CompositionLayer> layers = plannedLayers ?? CompositionPlanner.PlanFrame(project, frame);
+            foreach (CompositionLayer layer in layers)
             {
                 // Audio-only layers don't contribute to the visual frame.
-                if (layer.Track.Kind == TrackKind.Audio) continue;
+                if (layer.Track.Kind == TrackKind.Audio) 
+                    continue;
+
                 PaintLayer(canvas, activeFrames, layer, width, height, decodeScale);
             }
         }
@@ -128,7 +132,9 @@ public sealed class SkiaCompositor : ICompositor
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
         _defaultFrames?.Dispose();
     }
@@ -151,17 +157,19 @@ public sealed class SkiaCompositor : ICompositor
 
     private void PaintMediaClip(SKCanvas canvas, IClipFrameProvider frames, CompositionLayer layer, MediaClip clip, int projectWidth, int projectHeight, double decodeScale)
     {
-        if (clip.IsBroken) return;
+        if (clip.IsBroken) 
+            return;
 
-        var maybeFrame = frames.Acquire(clip, layer.SourceTime, decodeScale);
-        if (maybeFrame is null) return;
+        VideoFrame? maybeFrame = frames.Acquire(clip, layer.SourceTime, decodeScale);
+        if (maybeFrame is null) 
+            return;
 
-        var videoFrame = maybeFrame.Value;
+        VideoFrame videoFrame = maybeFrame.Value;
 
         // The transform and crop reason in NATIVE source pixels (clip.Source.Width/Height); the
         // decoded frame may be smaller under preview downscale (ADR 0008). Fall back to the frame's
         // own size when native dims are unknown.
-        var source = clip.Source;
+        MediaSource? source = clip.Source;
         int nativeWidth = source is { Width: > 0 } ? source.Width : videoFrame.Width;
         int nativeHeight = source is { Height: > 0 } ? source.Height : videoFrame.Height;
 
@@ -169,15 +177,15 @@ public sealed class SkiaCompositor : ICompositor
         {
             // Pin the rented byte[] so Skia can read it directly. SKImage.FromPixels does
             // not copy — the memory must stay valid for the lifetime of the image.
-            var handle = GCHandle.Alloc(videoFrame.Buffer, GCHandleType.Pinned);
+            GCHandle handle = GCHandle.Alloc(videoFrame.Buffer, GCHandleType.Pinned);
             try
             {
                 var srcInfo = new SKImageInfo(videoFrame.Width, videoFrame.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-                using var image = SKImage.FromPixels(srcInfo, handle.AddrOfPinnedObject(), videoFrame.Stride);
+                using SKImage image = SKImage.FromPixels(srcInfo, handle.AddrOfPinnedObject(), videoFrame.Stride);
 
                 // Matrix maps the NATIVE source extent -> project, so transforms/crops stay
                 // resolution-independent regardless of the decoded frame's size.
-                var (matrix, srcRect) = BuildLayerMatrix(clip.Transform, nativeWidth, nativeHeight, projectWidth, projectHeight);
+                (SKMatrix matrix, SKRect? srcRect) = BuildLayerMatrix(clip.Transform, nativeWidth, nativeHeight, projectWidth, projectHeight);
 
                 canvas.Save();
                 // Concat (not SetMatrix) so the global preview-quality pre-scale on the canvas
@@ -214,7 +222,8 @@ public sealed class SkiaCompositor : ICompositor
 
     private void PaintGraphicsClip(SKCanvas canvas, GraphicsClip clip, int projectWidth, int projectHeight)
     {
-        if (clip.Items.Count == 0) return;
+        if (clip.Items.Count == 0) 
+            return;
 
         // GraphicsClip items render through WPF's DrawingContext. We bounce through a
         // project-resolution RenderTargetBitmap, copy the pixels out, and hand them to
@@ -224,9 +233,9 @@ public sealed class SkiaCompositor : ICompositor
         // path only works on the UI thread. The preview wiring (step 7) does call from
         // the UI thread; off-thread playback (step 11) may need to address this.
         var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
+        using (DrawingContext dc = visual.RenderOpen())
         {
-            foreach (var item in clip.Items)
+            foreach (DrawingItem item in clip.Items)
             {
                 item.Render(dc);
             }
@@ -236,19 +245,19 @@ public sealed class SkiaCompositor : ICompositor
         rtb.Render(visual);
 
         int stride = projectWidth * 4;
-        var pixels = new byte[stride * projectHeight];
+        byte[] pixels = new byte[stride * projectHeight];
         rtb.CopyPixels(pixels, stride, 0);
 
-        var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+        GCHandle handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         try
         {
             var srcInfo = new SKImageInfo(projectWidth, projectHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
-            using var image = SKImage.FromPixels(srcInfo, handle.AddrOfPinnedObject(), stride);
+            using SKImage image = SKImage.FromPixels(srcInfo, handle.AddrOfPinnedObject(), stride);
 
             // Graphics clips draw in project-resolution space already, so the layer
             // matrix maps from (projectWidth × projectHeight) source to the same project
             // frame. Default Transform2D yields the identity matrix.
-            var (matrix, _) = BuildLayerMatrix(clip.Transform, projectWidth, projectHeight, projectWidth, projectHeight);
+            (SKMatrix matrix, _) = BuildLayerMatrix(clip.Transform, projectWidth, projectHeight, projectWidth, projectHeight);
 
             canvas.Save();
             // Concat (not SetMatrix) so the canvas's global proxy pre-scale is preserved.
@@ -303,7 +312,7 @@ public sealed class SkiaCompositor : ICompositor
 
         // M = T_clipCenter * R * S * T_-sourceCenter, computed via SKMatrix.Concat which
         // returns first * second. Read bottom-up: T_-sourceCenter applies first, T_clipCenter last.
-        var m = SKMatrix.CreateTranslation(-sourceCenterX, -sourceCenterY);
+        SKMatrix m = SKMatrix.CreateTranslation(-sourceCenterX, -sourceCenterY);
         m = SKMatrix.Concat(SKMatrix.CreateScale((float)transform.Scale.X, (float)transform.Scale.Y), m);
         m = SKMatrix.Concat(SKMatrix.CreateRotationDegrees((float)transform.RotationDegrees), m);
         m = SKMatrix.Concat(SKMatrix.CreateTranslation(clipCenterX, clipCenterY), m);

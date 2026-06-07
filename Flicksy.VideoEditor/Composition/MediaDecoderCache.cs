@@ -36,20 +36,31 @@ public sealed class MediaDecoderCache : IDisposable
     /// </summary>
     public IMediaDecoder? GetOrCreate(MediaClip clip, int targetSampleRate, double decodeScale = 1.0)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(MediaDecoderCache));
+        if (_disposed) 
+            throw new ObjectDisposedException(nameof(MediaDecoderCache));
 
         if (_decoders.TryGetValue(clip.Id, out var existing))
         {
             // Reuse the open cursor unless the preview decode scale changed, in which case the
             // decoder must re-open to emit frames at the new size.
-            if (existing.Scale == decodeScale) return existing.Decoder;
-            try { existing.Decoder.Dispose(); } catch { /* best-effort */ }
+            if (existing.Scale == decodeScale) 
+                return existing.Decoder;
+
+            try 
+            { 
+                existing.Decoder.Dispose(); 
+            } 
+            catch 
+            { 
+                // best-effort
+            }
             _decoders.Remove(clip.Id);
         }
 
-        var source = clip.Source;
-        var path = source?.SourcePath;
-        if (string.IsNullOrEmpty(path)) return null;
+        MediaSource? source = clip.Source;
+        string? path = source?.SourcePath;
+        if (string.IsNullOrEmpty(path)) 
+            return null;
 
         try
         {
@@ -69,7 +80,9 @@ public sealed class MediaDecoderCache : IDisposable
     // scale >= 1 or unknown source dims, decode native (null = no rescale).
     private static System.Drawing.Size? ResolveTargetSize(MediaSource source, double decodeScale)
     {
-        if (decodeScale >= 1.0 || source.Width <= 0 || source.Height <= 0) return null;
+        if (decodeScale >= 1.0 || source.Width <= 0 || source.Height <= 0) 
+            return null;
+
         int w = Math.Max(2, (int)Math.Round(source.Width * decodeScale));
         int h = Math.Max(2, (int)Math.Round(source.Height * decodeScale));
         return new System.Drawing.Size(w, h);
@@ -77,12 +90,21 @@ public sealed class MediaDecoderCache : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
 
-        foreach (var entry in _decoders.Values)
+        foreach ((IMediaDecoder decoder, double scale) in _decoders.Values)
         {
-            try { entry.Decoder.Dispose(); } catch { /* swallow — best-effort cleanup */ }
+            try 
+            {
+                decoder.Dispose(); 
+            } 
+            catch 
+            { 
+                // swallow — best-effort cleanup
+            }
         }
         _decoders.Clear();
     }

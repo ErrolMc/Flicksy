@@ -6,6 +6,23 @@
 
 The doc is written to be self-sufficient: it names every project, every namespace folder, every drawing tool, every undo command, and the file behind each. If the answer to "where does X live?" is in there, do not search.
 
+## Coding standards
+
+C# style rules for all code in this repo:
+
+- **A control-flow keyword never shares its line with the body.** `if`, `else`, `for`, `foreach`, `while`, `do`, etc. always put the body on the next line, even when it's a single statement.
+  ```csharp
+  if (blah)          // not: if (blah) doBlah();
+      doBlah();
+  ```
+- **Use `var` only when the type name already appears on that line** — i.e. the right-hand side is a `new` or a cast. If the right-hand side is a method or property call whose type isn't written on the line, use the explicit type.
+  ```csharp
+  var a = new Foo();   // ok — Foo is on the line
+  var b = (Foo)obj;    // ok — Foo is on the line
+  int c = Blah();      // ok — explicit type
+  var c = Blah();      // not allowed — type not on the line
+  ```
+
 ## Keeping ARCHITECTURE.md current
 
 Whenever you make a change that alters the structural picture, update ARCHITECTURE.md in the **same change**. Structural means: anything a future session would need the map to discover.

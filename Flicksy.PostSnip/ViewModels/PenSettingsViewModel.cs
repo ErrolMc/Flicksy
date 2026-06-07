@@ -62,9 +62,9 @@ public partial class PenSettingsViewModel : ObservableObject
             "#F48FB1", "#FFAB91", "#FFF59D", "#A5D6A7", "#81D4FA", "#B39DDB",
         };
 
-        foreach (var hex in hexes)
+        foreach (string hex in hexes)
         {
-            var color = (Color)ColorConverter.ConvertFromString(hex);
+            Color color = (Color)ColorConverter.ConvertFromString(hex);
             var brush = new SolidColorBrush(color);
             brush.Freeze();
             yield return new PenColorOption(brush);

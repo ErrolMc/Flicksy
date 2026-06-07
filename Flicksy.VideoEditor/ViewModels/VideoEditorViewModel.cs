@@ -140,7 +140,9 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
         // Engine first: stops the clock + audio output and unhooks Rendering before the
         // compositor's decoder cache (which the preview's last render may still touch) goes.

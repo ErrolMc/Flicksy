@@ -59,8 +59,8 @@ public partial class ClipView : UserControl
 
     private void ApplySelectionVisual()
     {
-        var selectedBrush = (Brush)Resources["ClipSelectedBrush"];
-        var defaultBrush = (Brush)Resources["ClipBorderBrush"];
+        Brush? selectedBrush = (Brush)Resources["ClipSelectedBrush"];
+        Brush? defaultBrush = (Brush)Resources["ClipBorderBrush"];
         OuterBorder.BorderBrush = IsSelected ? selectedBrush : defaultBrush;
         OuterBorder.BorderThickness = new Thickness(IsSelected ? 2 : 1);
     }
@@ -73,13 +73,17 @@ public partial class ClipView : UserControl
     // the left-button Preview path on TimelineView doesn't see right-clicks.
     private void OnClipRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is not Clip clip) return;
-        var timeline = FindTimelineViewModel();
-        if (timeline is null) return;
+        if (DataContext is not Clip clip) 
+            return;
+
+        TimelineViewModel? timeline = FindTimelineViewModel();
+        if (timeline is null) 
+            return;
 
         // A clip on a locked track is inert (ADR 0006): no right-click select, and the menu
         // is suppressed in OnContextMenuOpening. Bail before selecting.
-        if (timeline.FindTrack(clip)?.Locked == true) return;
+        if (timeline.FindTrack(clip)?.Locked == true) 
+            return;
 
         timeline.SelectedClip = clip;
     }
@@ -98,7 +102,7 @@ public partial class ClipView : UserControl
         // is the per-clip Name override on MediaClip). Detach audio additionally requires
         // Streams=Both — the spec wants users to discover both items even when they don't
         // apply to the current clip subtype.
-        var isMediaClip = DataContext is MediaClip;
+        bool isMediaClip = DataContext is MediaClip;
         RenameMenuItem.IsEnabled = isMediaClip;
         DetachAudioMenuItem.IsEnabled = DataContext is MediaClip { Streams: ClipStreams.Both };
     }
@@ -113,8 +117,10 @@ public partial class ClipView : UserControl
 
     private void OnDetachAudioClick(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not MediaClip clip) return;
-        var timeline = FindTimelineViewModel();
+        if (DataContext is not MediaClip clip) 
+            return;
+
+        TimelineViewModel? timeline = FindTimelineViewModel();
         timeline?.DetachAudio(clip);
     }
 
@@ -125,7 +131,8 @@ public partial class ClipView : UserControl
 
     private void OnRenameTextBoxVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (sender is not TextBox tb) return;
+        if (sender is not TextBox tb) 
+            return;
 
         if (e.NewValue is true)
         {
@@ -161,10 +168,12 @@ public partial class ClipView : UserControl
         // landed inside us — leave the rename open (lets the user reposition the caret
         // by clicking inside the TextBox, or interact with their own clip body). Walk
         // past the root without finding ourselves → click is outside → commit.
-        var current = e.OriginalSource as DependencyObject;
+        DependencyObject? current = e.OriginalSource as DependencyObject;
         while (current is not null)
         {
-            if (ReferenceEquals(current, this)) return;
+            if (ReferenceEquals(current, this)) 
+                return;
+
             current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current);
         }
 
@@ -183,8 +192,11 @@ public partial class ClipView : UserControl
 
     private void OnRenameTextBoxKeyDown(object sender, KeyEventArgs e)
     {
-        if (sender is not TextBox tb) return;
-        if (tb.DataContext is not MediaClip clip) return;
+        if (sender is not TextBox tb) 
+            return;
+
+        if (tb.DataContext is not MediaClip clip) 
+            return;
 
         if (e.Key == Key.Enter)
         {
@@ -200,8 +212,12 @@ public partial class ClipView : UserControl
 
     private void OnRenameTextBoxLostFocus(object sender, RoutedEventArgs e)
     {
-        if (sender is not TextBox tb) return;
-        if (tb.DataContext is not MediaClip clip) return;
+        if (sender is not TextBox tb) 
+            return;
+
+        if (tb.DataContext is not MediaClip clip) 
+            return;
+
         clip.CommitRename();
     }
 

@@ -1,5 +1,6 @@
 using System;
 using FFMediaToolkit.Audio;
+using FFMediaToolkit.Decoding;
 
 namespace Flicksy.Drawing.Media;
 
@@ -48,7 +49,7 @@ public sealed partial class FFmpegMediaDecoder
     /// </summary>
     private TimeSpan InitAudioStream()
     {
-        var info = _file!.Audio.Info;
+        AudioStreamInfo info = _file!.Audio.Info;
         _sourceSampleRate = info.SampleRate;
         _resampleRatio = _sourceSampleRate > 0 ? (double)_sourceSampleRate / _targetSampleRate : 1.0;
         return info.Duration;
@@ -59,22 +60,30 @@ public sealed partial class FFmpegMediaDecoder
         // Always start zeroed — every short-circuit path below leaves silence in place.
         destination.Clear();
 
-        if (destination.Length == 0) return;
-        if (_disposed || !HasAudio) return;
-        if (time >= Duration) return;
-        if (time < TimeSpan.Zero) time = TimeSpan.Zero;
+        if (destination.Length == 0) 
+            return;
+
+        if (_disposed || !HasAudio) 
+            return;
+
+        if (time >= Duration) 
+            return;
+
+        if (time < TimeSpan.Zero) 
+            time = TimeSpan.Zero;
 
         int frames = destination.Length / 2;
 
         lock (_gate)
         {
-            if (_file is null) return;
+            if (_file is null) 
+                return;
 
             // How much source time this call's output spans. Used both to detect whether
             // `time` continues the previous call (and so we can read forward) and to advance
             // the cursor afterwards.
-            var callSpan = TimeSpan.FromSeconds(frames / (double)_targetSampleRate);
-            var tolerance = TimeSpan.FromSeconds(callSpan.TotalSeconds * 0.5);
+            TimeSpan callSpan = TimeSpan.FromSeconds(frames / (double)_targetSampleRate);
+            TimeSpan tolerance = TimeSpan.FromSeconds(callSpan.TotalSeconds * 0.5);
 
             bool continuous = _audioPositioned
                 && time >= _audioCursorTime - tolerance
@@ -116,12 +125,12 @@ public sealed partial class FFmpegMediaDecoder
 
         try
         {
-            using var data = _file!.Audio.GetFrame(time);
+            using AudioData data = _file!.Audio.GetFrame(time);
             int n = CopyRemixedToSrcChunk(data);
 
             // Drop the head samples that precede `time` so playback starts frame-accurately
             // rather than at the decoded frame's boundary (~21ms granularity at 48k/1024).
-            var framePts = _file.Audio.Position;
+            TimeSpan framePts = _file.Audio.Position;
             if (framePts <= time && _sourceSampleRate > 0)
             {
                 int skip = (int)Math.Round((time - framePts).TotalSeconds * _sourceSampleRate);
@@ -210,11 +219,14 @@ public sealed partial class FFmpegMediaDecoder
     /// <summary>Decode the next source frame (read-forward) and remix it into <see cref="_srcChunk"/>.</summary>
     private bool DecodeNextSourceChunk()
     {
-        if (_file is null) return false;
+        if (_file is null) 
+            return false;
 
         try
         {
-            if (!_file.Audio.TryGetNextFrame(out var data)) return false;
+            if (!_file.Audio.TryGetNextFrame(out var data)) 
+                return false;
+
             try
             {
                 _srcChunkLen = CopyRemixedToSrcChunk(data);
@@ -253,12 +265,14 @@ public sealed partial class FFmpegMediaDecoder
     {
         int n = data.NumSamples;
         int ch = data.NumChannels;
-        if (n <= 0 || ch <= 0) return 0;
+        if (n <= 0 || ch <= 0) 
+            return 0;
 
-        if (_srcChunk.Length < n * 2) _srcChunk = new float[n * 2];
+        if (_srcChunk.Length < n * 2) 
+            _srcChunk = new float[n * 2];
 
-        var left = data.GetChannelData(0);
-        var right = ch >= 2 ? data.GetChannelData(1) : left;
+        Span<float> left = data.GetChannelData(0);
+        Span<float> right = ch >= 2 ? data.GetChannelData(1) : left;
 
         for (int i = 0; i < n; i++)
         {

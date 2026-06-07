@@ -19,7 +19,7 @@ internal sealed class ScreenRecorder(Action<string> onRecordingCompleted) : IDis
         }
 
         _recordingPath = Path.Combine(Path.GetTempPath(), $"flicksy-recording-{Guid.NewGuid():N}.mp4");
-        var ffmpegArguments = BuildArguments(screenBounds, selectionRect, _recordingPath);
+        string ffmpegArguments = BuildArguments(screenBounds, selectionRect, _recordingPath);
 
         var startInfo = new ProcessStartInfo
         {
@@ -86,23 +86,23 @@ internal sealed class ScreenRecorder(Action<string> onRecordingCompleted) : IDis
 
     private static string BuildArguments(Rectangle screenBounds, Rectangle selectionRect, string outputPath)
     {
-        var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
+        Rectangle virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
         var absoluteCaptureArea = new Rectangle(
             screenBounds.Left + selectionRect.Left,
             screenBounds.Top + selectionRect.Top,
             selectionRect.Width,
             selectionRect.Height);
 
-        var boundedCaptureArea = Rectangle.Intersect(absoluteCaptureArea, virtualScreen);
+        Rectangle boundedCaptureArea = Rectangle.Intersect(absoluteCaptureArea, virtualScreen);
         if (boundedCaptureArea.Width <= 1 || boundedCaptureArea.Height <= 1)
         {
             throw new InvalidOperationException("Selected recording area is outside available displays.");
         }
 
-        var captureX = boundedCaptureArea.Left;
-        var captureY = boundedCaptureArea.Top;
-        var captureWidth = boundedCaptureArea.Width & ~1;
-        var captureHeight = boundedCaptureArea.Height & ~1;
+        int captureX = boundedCaptureArea.Left;
+        int captureY = boundedCaptureArea.Top;
+        int captureWidth = boundedCaptureArea.Width & ~1;
+        int captureHeight = boundedCaptureArea.Height & ~1;
 
         if (captureWidth < 2 || captureHeight < 2)
         {
@@ -114,7 +114,7 @@ internal sealed class ScreenRecorder(Action<string> onRecordingCompleted) : IDis
 
     private static bool WaitForRecordingFile(string recordingPath)
     {
-        for (var i = 0; i < 20; i++)
+        for (int i = 0; i < 20; i++)
         {
             if (File.Exists(recordingPath))
             {

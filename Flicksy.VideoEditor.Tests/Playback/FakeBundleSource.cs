@@ -64,7 +64,8 @@ internal sealed class FakeBundleSource : IFrameBundleSource
     public FrameBundle? Produce(int frame, int generation, double decodeScale)
     {
         // Guards the join-before-dispose ordering: the pump must never call Produce after Dispose.
-        if (Disposed) throw new InvalidOperationException("Produce called after Dispose — ordering bug.");
+        if (Disposed)
+            throw new InvalidOperationException("Produce called after Dispose — ordering bug.");
 
         _entered.Set();
         _hold.Wait(HoldSafetyTimeoutMs);
@@ -74,7 +75,8 @@ internal sealed class FakeBundleSource : IFrameBundleSource
         lock (_lock)
         {
             _producedFrames.Add(frame);
-            if (NullFrames.Contains(frame)) return null;
+            if (NullFrames.Contains(frame))
+                return null;
 
             var frames = new Dictionary<Guid, VideoFrame>();
             if (!EmptyFrames)
@@ -91,9 +93,10 @@ internal sealed class FakeBundleSource : IFrameBundleSource
     {
         lock (_lock)
         {
-            foreach (var vf in bundle.Frames.Values)
+            foreach (VideoFrame vf in bundle.Frames.Values)
             {
-                if (!_outstanding.Remove(vf.Buffer)) DoubleOrForeignReturns++;
+                if (!_outstanding.Remove(vf.Buffer))
+                    DoubleOrForeignReturns++;
             }
         }
         bundle.Frames.Clear(); // mirror ProjectBundleSource: guard against a double-recycle

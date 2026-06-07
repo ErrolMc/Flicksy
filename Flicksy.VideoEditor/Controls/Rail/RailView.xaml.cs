@@ -94,10 +94,13 @@ public partial class RailView : UserControl
 
     private void SyncListBoxSelectionFromTag()
     {
-        if (_syncingSelection) return;
-        if (ItemsSource is null) return;
+        if (_syncingSelection) 
+            return;
 
-        var match = ItemsSource.OfType<RailItem>().FirstOrDefault(i => Equals(i.Tag, SelectedTag));
+        if (ItemsSource is null) 
+            return;
+
+        RailItem? match = ItemsSource.OfType<RailItem>().FirstOrDefault(i => Equals(i.Tag, SelectedTag));
 
         _syncingSelection = true;
         try
@@ -117,12 +120,18 @@ public partial class RailView : UserControl
         // internal HandleMouseButtonDown bails when Focus() fails. So we handle the
         // click ourselves: same-item toggles IsPanelOpen, different-item changes
         // selection and opens.
-        if (e.OriginalSource is not DependencyObject source) return;
+        if (e.OriginalSource is not DependencyObject source) 
+            return;
 
-        var container = ItemsControl.ContainerFromElement(RailList, source) as ListBoxItem;
-        if (container is null) return;
-        if (!container.IsEnabled) return;
-        if (container.DataContext is not RailItem item) return;
+        ListBoxItem? container = ItemsControl.ContainerFromElement(RailList, source) as ListBoxItem;
+        if (container is null) 
+            return;
+
+        if (!container.IsEnabled) 
+            return;
+
+        if (container.DataContext is not RailItem item) 
+            return;
 
         if (Equals(SelectedTag, item.Tag))
         {

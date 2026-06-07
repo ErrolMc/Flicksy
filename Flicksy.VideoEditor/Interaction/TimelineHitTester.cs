@@ -48,15 +48,21 @@ public static class TimelineHitTester
         double trackHeight,
         double edgePixels = DefaultEdgePixels)
     {
-        if (tracks is null) throw new ArgumentNullException(nameof(tracks));
-        if (pixelsPerFrame <= 0 || trackHeight <= 0) return TimelineHit.Miss;
-        if (y < 0) return TimelineHit.Miss;
+        if (tracks is null) 
+            throw new ArgumentNullException(nameof(tracks));
 
-        var trackIndex = (int)Math.Floor(y / trackHeight);
-        if (trackIndex < 0 || trackIndex >= tracks.Count) return TimelineHit.Miss;
+        if (pixelsPerFrame <= 0 || trackHeight <= 0) 
+            return TimelineHit.Miss;
 
-        var track = tracks[trackIndex];
-        var frame = FrameAt(x, pixelsPerFrame);
+        if (y < 0) 
+            return TimelineHit.Miss;
+
+        int trackIndex = (int)Math.Floor(y / trackHeight);
+        if (trackIndex < 0 || trackIndex >= tracks.Count) 
+            return TimelineHit.Miss;
+
+        Track track = tracks[trackIndex];
+        int frame = FrameAt(x, pixelsPerFrame);
 
         // Locked track: report the track + frame but never a clip or edge, so edit tools
         // (Move/Trim) find nothing to grab while scrub/clear-select still works.
@@ -69,13 +75,14 @@ public static class TimelineHitTester
         // (not rounded-frame-based) so the hit matches exactly what ClipView draws — otherwise
         // a click in a clip's last sub-frame-pixel rounds up to the half-open end and misses.
         // Clips on a track never overlap (model invariant), so at most one matches.
-        foreach (var clip in track.Clips)
+        foreach (Clip clip in track.Clips)
         {
-            var leftPx = clip.TimelineStart * pixelsPerFrame;
-            var rightPx = leftPx + Math.Max(1, clip.Duration) * pixelsPerFrame;
-            if (x < leftPx || x >= rightPx) continue;
+            double leftPx = clip.TimelineStart * pixelsPerFrame;
+            double rightPx = leftPx + Math.Max(1, clip.Duration) * pixelsPerFrame;
+            if (x < leftPx || x >= rightPx) 
+                continue;
 
-            var zone = ResolveZone(x, leftPx, rightPx, edgePixels);
+            HitZone zone = ResolveZone(x, leftPx, rightPx, edgePixels);
             return new TimelineHit(track, clip, zone, frame);
         }
 
@@ -106,29 +113,37 @@ public static class TimelineHitTester
         double pixelsPerFrame,
         double trackHeight)
     {
-        if (tracks is null) throw new ArgumentNullException(nameof(tracks));
+        if (tracks is null) 
+            throw new ArgumentNullException(nameof(tracks));
 
         var result = new List<Clip>();
-        if (pixelsPerFrame <= 0 || trackHeight <= 0) return result;
-        if (width <= 0 || height <= 0) return result;   // a zero-area band selects nothing
+        if (pixelsPerFrame <= 0 || trackHeight <= 0) 
+            return result;
 
-        var right = left + width;
-        var bottom = top + height;
+        if (width <= 0 || height <= 0) 
+            return result;   // a zero-area band selects nothing
 
-        for (var i = 0; i < tracks.Count; i++)
+        double right = left + width;
+        double bottom = top + height;
+
+        for (int i = 0; i < tracks.Count; i++)
         {
-            var track = tracks[i];
-            if (track.Locked) continue;   // inert per ADR 0006 — never marquee-selectable
+            Track track = tracks[i];
+            if (track.Locked) 
+                continue;   // inert per ADR 0006 — never marquee-selectable
 
-            var laneTop = i * trackHeight;
-            var laneBottom = laneTop + trackHeight;
-            if (bottom <= laneTop || top >= laneBottom) continue;   // no vertical overlap with this lane
+            double laneTop = i * trackHeight;
+            double laneBottom = laneTop + trackHeight;
+            if (bottom <= laneTop || top >= laneBottom) 
+                continue;   // no vertical overlap with this lane
 
-            foreach (var clip in track.Clips)
+            foreach (Clip clip in track.Clips)
             {
-                var leftPx = clip.TimelineStart * pixelsPerFrame;
-                var rightPx = leftPx + Math.Max(1, clip.Duration) * pixelsPerFrame;
-                if (right <= leftPx || left >= rightPx) continue;   // no horizontal overlap with this clip
+                double leftPx = clip.TimelineStart * pixelsPerFrame;
+                double rightPx = leftPx + Math.Max(1, clip.Duration) * pixelsPerFrame;
+                if (right <= leftPx || left >= rightPx) 
+                    continue;   // no horizontal overlap with this clip
+
                 result.Add(clip);
             }
         }
@@ -142,7 +157,9 @@ public static class TimelineHitTester
     /// </summary>
     public static int FrameAt(double x, double pixelsPerFrame)
     {
-        if (pixelsPerFrame <= 0) return 0;
+        if (pixelsPerFrame <= 0) 
+            return 0;
+
         return Math.Max(0, (int)Math.Round(x / pixelsPerFrame));
     }
 
@@ -150,10 +167,14 @@ public static class TimelineHitTester
     {
         // Clamp the grab band to a third of the clip so the two edge bands never meet: a
         // narrow clip keeps a middle-third body that resolves to Body (grabbable for Move).
-        var band = Math.Min(edgePixels, (rightPx - leftPx) / 3.0);
+        double band = Math.Min(edgePixels, (rightPx - leftPx) / 3.0);
 
-        if (x <= leftPx + band) return HitZone.LeftEdge;
-        if (x >= rightPx - band) return HitZone.RightEdge;
+        if (x <= leftPx + band) 
+            return HitZone.LeftEdge;
+
+        if (x >= rightPx - band) 
+            return HitZone.RightEdge;
+
         return HitZone.Body;
     }
 }

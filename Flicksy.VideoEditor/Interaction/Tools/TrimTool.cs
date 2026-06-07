@@ -48,8 +48,11 @@ public sealed class TrimTool : ITimelineTool
     public bool OnPointerDown(Point point, TimelineHit hit, MouseButtonEventArgs e)
     {
         // Edges only, MediaClip only (see the class note on the GraphicsClip deferral).
-        if (hit.Clip is not MediaClip clip) return false;
-        if (hit.Zone is not (HitZone.LeftEdge or HitZone.RightEdge)) return false;
+        if (hit.Clip is not MediaClip clip) 
+            return false;
+
+        if (hit.Zone is not (HitZone.LeftEdge or HitZone.RightEdge)) 
+            return false;
 
         _clip = clip;
         _fromLeft = hit.Zone == HitZone.LeftEdge;
@@ -68,7 +71,8 @@ public sealed class TrimTool : ITimelineTool
 
     public void OnPointerMove(Point point, MouseEventArgs e)
     {
-        if (!_active || _clip is null) return;
+        if (!_active || _clip is null) 
+            return;
 
         if (!_dragStarted)
         {
@@ -80,19 +84,24 @@ public sealed class TrimTool : ITimelineTool
             _dragStarted = true;
         }
 
-        var ppf = _surface.PixelsPerFrame;
-        if (ppf <= 0) return;
+        double ppf = _surface.PixelsPerFrame;
+        if (ppf <= 0) 
+            return;
 
-        var deltaFrames = (int)Math.Round((point.X - _grabPoint.X) / ppf);
-        var result = _viewModel.ResolveTrim(_clip, _fromLeft, _originalEdgeFrame + deltaFrames);
+        int deltaFrames = (int)Math.Round((point.X - _grabPoint.X) / ppf);
+        TrimResult result = _viewModel.ResolveTrim(_clip, _fromLeft, _originalEdgeFrame + deltaFrames);
         Apply(result);
     }
 
     public void OnPointerUp(Point point, MouseButtonEventArgs e)
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
+
         _surface.ReleasePointer();
-        if (_dragStarted) CommitTrim();
+        if (_dragStarted) 
+            CommitTrim();
+
         ResetGesture();
     }
 
@@ -100,21 +109,25 @@ public sealed class TrimTool : ITimelineTool
     {
         // Resize cursor over a trimmable (MediaClip) edge; default over anything else routed here
         // (e.g. a GraphicsClip edge, which v1 can't trim).
-        var onEdge = hit.Clip is MediaClip && hit.Zone is (HitZone.LeftEdge or HitZone.RightEdge);
+        bool onEdge = hit.Clip is MediaClip && hit.Zone is (HitZone.LeftEdge or HitZone.RightEdge);
         _surface.Cursor = onEdge ? Cursors.SizeWE : null;
     }
 
     public void Cancel()
     {
-        if (!_active) return;
+        if (!_active)
+            return;
+
         _surface.ReleasePointer();
-        if (_dragStarted) Apply(_before);   // revert the live mutation
+        if (_dragStarted) 
+            Apply(_before);   // revert the live mutation
+
         ResetGesture();
     }
 
     private void Apply(TrimResult state)
     {
-        var clip = _clip!;
+        MediaClip clip = _clip!;
         clip.SourceIn = state.SourceIn;
         clip.SourceOut = state.SourceOut;
         clip.TimelineStart = state.TimelineStart;
@@ -122,7 +135,7 @@ public sealed class TrimTool : ITimelineTool
 
     private void CommitTrim()
     {
-        var after = TrimResult.Capture(_clip!);
+        TrimResult after = TrimResult.Capture(_clip!);
         if (after != _before)
         {
             _viewModel.History.Push(new TrimClipCommand(_viewModel, _clip!, _before, after));

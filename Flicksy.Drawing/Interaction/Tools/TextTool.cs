@@ -42,7 +42,7 @@ public sealed class TextTool : IDrawingTool
         }
         else
         {
-            var created = _viewModel.BeginText(
+            TextItem created = _viewModel.BeginText(
                 point,
                 _config.TextFontFamily,
                 _config.TextFontSize,

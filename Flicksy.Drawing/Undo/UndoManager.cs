@@ -45,7 +45,7 @@ public partial class UndoManager : ObservableObject
             return;
         }
 
-        var command = node.Value;
+        IUndoableCommand command = node.Value;
         _undo.RemoveLast();
         command.Undo();
         _redo.Push(command);
@@ -60,7 +60,7 @@ public partial class UndoManager : ObservableObject
             return;
         }
 
-        var command = _redo.Pop();
+        IUndoableCommand command = _redo.Pop();
         command.Redo();
         _undo.AddLast(command);
         RefreshFlags();

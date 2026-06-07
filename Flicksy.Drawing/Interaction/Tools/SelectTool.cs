@@ -53,12 +53,12 @@ public sealed class SelectTool : IDrawingTool
         // Corner-handle drag of the currently selected item -> begin scaling.
         if (_viewModel.SelectedItem is { } current)
         {
-            var corner = GetCornerHit(current, point);
+            CornerKind corner = GetCornerHit(current, point);
             if (corner != CornerKind.None)
             {
-                var canonical = current.CanonicalBounds;
-                var (anchorCanonical, grabbedCanonical) = GetAnchorAndGrabbed(canonical, corner);
-                var m = current.Transform.Matrix;
+                Rect canonical = current.CanonicalBounds;
+                (Point anchorCanonical, Point grabbedCanonical) = GetAnchorAndGrabbed(canonical, corner);
+                Matrix m = current.Transform.Matrix;
                 _scalingItem = current;
                 _scaleBaseMatrix = m;
                 _scaleAnchorWorld = m.Transform(anchorCanonical);
@@ -68,7 +68,7 @@ public sealed class SelectTool : IDrawingTool
             }
         }
 
-        var hit = DrawingMath.HitTestTopmost(_viewModel.Items, point);
+        DrawingItem? hit = DrawingMath.HitTestTopmost(_viewModel.Items, point);
         if (hit is not null)
         {
             if (hit == _viewModel.SelectedItem)
@@ -102,12 +102,12 @@ public sealed class SelectTool : IDrawingTool
     {
         if (_scalingItem is not null)
         {
-            var oldDiag = _scaleOriginalGrabbedWorld - _scaleAnchorWorld;
-            var oldLengthSq = oldDiag.X * oldDiag.X + oldDiag.Y * oldDiag.Y;
+            Vector oldDiag = _scaleOriginalGrabbedWorld - _scaleAnchorWorld;
+            double oldLengthSq = oldDiag.X * oldDiag.X + oldDiag.Y * oldDiag.Y;
             if (oldLengthSq > double.Epsilon)
             {
-                var offset = point - _scaleAnchorWorld;
-                var factor = (offset.X * oldDiag.X + offset.Y * oldDiag.Y) / oldLengthSq;
+                Vector offset = point - _scaleAnchorWorld;
+                double factor = (offset.X * oldDiag.X + offset.Y * oldDiag.Y) / oldLengthSq;
                 if (Math.Abs(factor) < 0.01d)
                 {
                     factor = factor < 0 ? -0.01d : 0.01d;
@@ -119,7 +119,7 @@ public sealed class SelectTool : IDrawingTool
 
         if (_draggingItem is not null)
         {
-            var totalDelta = point - _moveStartPoint;
+            Vector totalDelta = point - _moveStartPoint;
             _draggingItem.TranslateFrom(_moveBaseMatrix, totalDelta);
         }
     }

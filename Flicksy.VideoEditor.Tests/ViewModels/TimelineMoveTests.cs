@@ -27,9 +27,9 @@ public class TimelineMoveTests
     public void SnapStartEdge_ExcludesDraggedClipOwnEdges()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var dragged = AddClip(video, start: 10, duration: 10);   // [10, 20)
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip dragged = AddClip(video, start: 10, duration: 10);   // [10, 20)
+        TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 500;                             // park the playhead far away
 
         // Without exclusion, 12 snaps to the clip's own start (10) — 2 frames, inside the radius.
@@ -42,11 +42,11 @@ public class TimelineMoveTests
     public void SnapStartEdge_SnapsToClipEdgeOnAnotherTrack()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var audio = AddTrack(project, TrackKind.Audio);
-        var dragged = AddClip(video, 10, 10);
+        Track video = AddTrack(project, TrackKind.Video);
+        Track audio = AddTrack(project, TrackKind.Audio);
+        GraphicsClip dragged = AddClip(video, 10, 10);
         AddClip(audio, 50, 10);                                  // [50, 60) on the audio lane
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 500;
 
         // 48 is 2 frames from the audio clip's start (50) → snaps across tracks.
@@ -57,9 +57,9 @@ public class TimelineMoveTests
     public void SnapStartEdge_SnapsToFrameZero()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var dragged = AddClip(video, 100, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip dragged = AddClip(video, 100, 10);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 500;                             // not near 0
 
         Assert.That(vm.SnapStartEdge(3, new HashSet<Clip> { dragged }), Is.EqualTo(0));
@@ -71,9 +71,9 @@ public class TimelineMoveTests
     public void Snap_GapWalk_ExcludesDraggedClipFromItsOwnGap()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var dragged = AddClip(video, 50, 30);                    // [50, 80) — the only clip
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip dragged = AddClip(video, 50, 30);                    // [50, 80) — the only clip
+        TimelineViewModel vm = MakeViewModel(project);
 
         // Alt bypasses edge snap so the gap walk is isolated. Excluding the dragged clip leaves an
         // empty lane → it sits exactly where dropped.
@@ -89,10 +89,10 @@ public class TimelineMoveTests
     public void ClampGroupDelta_FreeGroup_MovesByFullDelta_ButFloorsAtFrameZero()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var a = AddClip(video, 0, 10);
-        var b = AddClip(video, 20, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip a = AddClip(video, 0, 10);
+        GraphicsClip b = AddClip(video, 20, 10);
+        TimelineViewModel vm = MakeViewModel(project);
         var moved = new List<(Clip, int)> { (a, 0), (b, 20) };
 
         Assert.That(vm.ClampGroupDelta(moved, 100), Is.EqualTo(100));   // unobstructed to the right
@@ -103,11 +103,11 @@ public class TimelineMoveTests
     public void ClampGroupDelta_DraggingPastStaticIntoFreeSpace_FollowsTheDrag()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var a = AddClip(video, 0, 10);      // moved
-        var b = AddClip(video, 30, 10);     // moved [30, 40)
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip a = AddClip(video, 0, 10);      // moved
+        GraphicsClip b = AddClip(video, 30, 10);     // moved [30, 40)
         AddClip(video, 50, 10);             // static [50, 60)
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         var moved = new List<(Clip, int)> { (a, 0), (b, 30) };
 
         // Far to the right is free, so the group jumps over the static clip instead of sticking to
@@ -119,11 +119,11 @@ public class TimelineMoveTests
     public void ClampGroupDelta_OverlapResolvesToNearestFittingDelta()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var a = AddClip(video, 0, 10);      // moved [0, 10)
-        var b = AddClip(video, 20, 10);     // moved [20, 30) — internal gap [10, 20)
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip a = AddClip(video, 0, 10);      // moved [0, 10)
+        GraphicsClip b = AddClip(video, 20, 10);     // moved [20, 30) — internal gap [10, 20)
         AddClip(video, 40, 10);             // static [40, 50)
-        var vm = MakeViewModel(project);
+        TimelineViewModel vm = MakeViewModel(project);
         var moved = new List<(Clip, int)> { (a, 0), (b, 20) };
 
         // +45 would drop A onto the static clip; the nearest fit jumps the whole group fully past
@@ -137,10 +137,10 @@ public class TimelineMoveTests
     public void ClampGroupDelta_LeftDrag_FloorsAtFrameZeroForEarliestClip()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var a = AddClip(video, 5, 10);      // earliest moved clip
-        var b = AddClip(video, 40, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip a = AddClip(video, 5, 10);      // earliest moved clip
+        GraphicsClip b = AddClip(video, 40, 10);
+        TimelineViewModel vm = MakeViewModel(project);
         var moved = new List<(Clip, int)> { (a, 5), (b, 40) };
 
         Assert.That(vm.ClampGroupDelta(moved, -100), Is.EqualTo(-5));   // A pinned at frame 0
@@ -152,10 +152,10 @@ public class TimelineMoveTests
     public void CanMoveToTrack_SameKindUnlocked_Allowed()
     {
         var project = new ProjectModel();
-        var v1 = AddTrack(project, TrackKind.Video);
-        var v2 = AddTrack(project, TrackKind.Video);
-        var clip = AddClip(v1, 0, 10);
-        var vm = MakeViewModel(project);
+        Track v1 = AddTrack(project, TrackKind.Video);
+        Track v2 = AddTrack(project, TrackKind.Video);
+        GraphicsClip clip = AddClip(v1, 0, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         Assert.That(vm.CanMoveToTrack(clip, v2), Is.True);
         Assert.That(vm.CanMoveToTrack(clip, v1), Is.True);   // its own track
@@ -165,10 +165,10 @@ public class TimelineMoveTests
     public void CanMoveToTrack_DifferentKind_Refused()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var audio = AddTrack(project, TrackKind.Audio);
-        var clip = AddClip(video, 0, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        Track audio = AddTrack(project, TrackKind.Audio);
+        GraphicsClip clip = AddClip(video, 0, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         Assert.That(vm.CanMoveToTrack(clip, audio), Is.False);
     }
@@ -177,10 +177,10 @@ public class TimelineMoveTests
     public void CanMoveToTrack_LockedTarget_Refused()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var locked = AddTrack(project, TrackKind.Video, locked: true);
-        var clip = AddClip(video, 0, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        Track locked = AddTrack(project, TrackKind.Video, locked: true);
+        GraphicsClip clip = AddClip(video, 0, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         Assert.That(vm.CanMoveToTrack(clip, locked), Is.False);
     }
@@ -191,12 +191,12 @@ public class TimelineMoveTests
     public void MoveClipToTrack_InsertsInTimelineStartOrder()
     {
         var project = new ProjectModel();
-        var v1 = AddTrack(project, TrackKind.Video);
-        var v2 = AddTrack(project, TrackKind.Video);
-        var early = AddClip(v2, 0, 10);
-        var late = AddClip(v2, 100, 10);
-        var moving = AddClip(v1, 0, 10);
-        var vm = MakeViewModel(project);
+        Track v1 = AddTrack(project, TrackKind.Video);
+        Track v2 = AddTrack(project, TrackKind.Video);
+        GraphicsClip early = AddClip(v2, 0, 10);
+        GraphicsClip late = AddClip(v2, 100, 10);
+        GraphicsClip moving = AddClip(v1, 0, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.MoveClipToTrack(moving, v2, 50);   // lands between early and late
         Assert.That(v2.Clips, Is.EqualTo(new Clip[] { early, moving, late }));
@@ -209,9 +209,9 @@ public class TimelineMoveTests
     public void MoveClipCommand_UndoRedo_RestoresStartAndSelectsClip()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var clip = AddClip(video, 10, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip clip = AddClip(video, 10, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         clip.TimelineStart = 40;                          // the gesture mutates live
         vm.History.Push(new MoveClipCommand(vm, clip, before: 10, after: 40));
@@ -228,10 +228,10 @@ public class TimelineMoveTests
     public void MoveClipBetweenTracksCommand_UndoRedo_RestoresTrackAndStart()
     {
         var project = new ProjectModel();
-        var v1 = AddTrack(project, TrackKind.Video);
-        var v2 = AddTrack(project, TrackKind.Video);
-        var clip = AddClip(v1, 10, 10);
-        var vm = MakeViewModel(project);
+        Track v1 = AddTrack(project, TrackKind.Video);
+        Track v2 = AddTrack(project, TrackKind.Video);
+        GraphicsClip clip = AddClip(v1, 10, 10);
+        TimelineViewModel vm = MakeViewModel(project);
 
         vm.MoveClipToTrack(clip, v2, 60);                 // live cross-track move
         vm.History.Push(new MoveClipBetweenTracksCommand(vm, clip, v1, 10, v2, 60));
@@ -251,10 +251,10 @@ public class TimelineMoveTests
     public void MultiMove_CompositeWithSelectionScope_RestoresFullSelectionOnUndo()
     {
         var project = new ProjectModel();
-        var video = AddTrack(project, TrackKind.Video);
-        var a = AddClip(video, 0, 10);
-        var b = AddClip(video, 50, 10);
-        var vm = MakeViewModel(project);
+        Track video = AddTrack(project, TrackKind.Video);
+        GraphicsClip a = AddClip(video, 0, 10);
+        GraphicsClip b = AddClip(video, 50, 10);
+        TimelineViewModel vm = MakeViewModel(project);
         vm.SetSelection(new[] { a, b }, a);
 
         a.TimelineStart = 20;                             // live rigid-group move of +20

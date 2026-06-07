@@ -84,7 +84,8 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape) return;
+        if (e.Key != Key.Escape) 
+            return;
 
         // Esc first cancels an in-progress gesture; otherwise it exits razor mode. A captured pointer
         // doesn't capture the keyboard, so this listens at the owning window, not on this control.
@@ -165,10 +166,11 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnLanesPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (ViewModel is null) return;
+        if (ViewModel is null) 
+            return;
 
-        var point = e.GetPosition(LanesHost);
-        var hit = HitTest(point);
+        Point point = e.GetPosition(LanesHost);
+        TimelineHit hit = HitTest(point);
         if (_toolRouter.OnPointerDown(point, hit, e))
         {
             e.Handled = true;
@@ -177,9 +179,10 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnLanesPreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (ViewModel is null) return;
+        if (ViewModel is null) 
+            return;
 
-        var point = e.GetPosition(LanesHost);
+        Point point = e.GetPosition(LanesHost);
 
         if (_toolRouter.HasActiveGesture)
         {
@@ -203,10 +206,11 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     private void OnRootPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        var vm = ViewModel;
-        if (vm is null) return;
+        TimelineViewModel? vm = ViewModel;
+        if (vm is null) 
+            return;
 
-        var mods = Keyboard.Modifiers;
+        ModifierKeys mods = Keyboard.Modifiers;
 
         if ((mods & ModifierKeys.Control) == ModifierKeys.Control)
         {
@@ -234,16 +238,16 @@ public partial class TimelineView : UserControl, ITimelineSurface
         // for the playhead is just playhead × PixelsPerFrame (no header offset). Capture
         // the playhead's current screen X, apply the zoom, then re-derive the scroll
         // offset so the playhead lands at the same screen X.
-        var oldPxPerFrame = vm.PixelsPerFrame;
-        var playhead = vm.Transport.Playhead;
+        double oldPxPerFrame = vm.PixelsPerFrame;
+        int playhead = vm.Transport.Playhead;
 
-        var oldContentX = playhead * oldPxPerFrame;
-        var screenX = oldContentX - MainScroller.HorizontalOffset;
+        double oldContentX = playhead * oldPxPerFrame;
+        double screenX = oldContentX - MainScroller.HorizontalOffset;
 
         vm.ZoomBy(factor);
 
-        var newContentX = playhead * vm.PixelsPerFrame;
-        var newOffset = Math.Max(0, newContentX - screenX);
+        double newContentX = playhead * vm.PixelsPerFrame;
+        double newOffset = Math.Max(0, newContentX - screenX);
         MainScroller.ScrollToHorizontalOffset(newOffset);
     }
 
@@ -261,8 +265,10 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     public TimelineHit HitTest(Point contentPoint)
     {
-        var vm = ViewModel;
-        if (vm is null) return TimelineHit.Miss;
+        TimelineViewModel? vm = ViewModel;
+        if (vm is null) 
+            return TimelineHit.Miss;
+
         return TimelineHitTester.HitTest(
             contentPoint.X,
             contentPoint.Y,
@@ -282,8 +288,10 @@ public partial class TimelineView : UserControl, ITimelineSurface
     // LanesHost content space, matching the rect the MarqueeTool builds from captured content points.
     void ITimelineSurface.ShowMarquee(Rect contentRect)
     {
-        var layer = AdornerLayer.GetAdornerLayer(LanesHost);
-        if (layer is null) return;
+        AdornerLayer? layer = AdornerLayer.GetAdornerLayer(LanesHost);
+        if (layer is null) 
+            return;
+
         if (_marqueeAdorner is null)
         {
             _marqueeAdorner = new MarqueeAdorner(LanesHost);
@@ -294,8 +302,10 @@ public partial class TimelineView : UserControl, ITimelineSurface
 
     void ITimelineSurface.HideMarquee()
     {
-        if (_marqueeAdorner is null) return;
-        var layer = AdornerLayer.GetAdornerLayer(LanesHost);
+        if (_marqueeAdorner is null) 
+            return;
+
+        AdornerLayer? layer = AdornerLayer.GetAdornerLayer(LanesHost);
         layer?.Remove(_marqueeAdorner);
         _marqueeAdorner = null;
     }
@@ -327,7 +337,8 @@ internal sealed class MarqueeAdorner : Adorner
 
     protected override void OnRender(DrawingContext dc)
     {
-        if (_rect.Width <= 0 || _rect.Height <= 0) return;
+        if (_rect.Width <= 0 || _rect.Height <= 0) 
+            return;
         dc.DrawRectangle(Fill, Border, _rect);
     }
 

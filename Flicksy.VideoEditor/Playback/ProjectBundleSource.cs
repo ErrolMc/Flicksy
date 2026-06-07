@@ -46,15 +46,23 @@ public sealed class ProjectBundleSource : IFrameBundleSource
         }
 
         var frames = new Dictionary<Guid, VideoFrame>();
-        foreach (var layer in layers)
+        foreach (CompositionLayer layer in layers)
         {
-            if (layer.Track.Kind == TrackKind.Audio) continue;
-            if (layer.Clip is not MediaClip clip) continue;   // GraphicsClip → painted inline
-            if (clip.Streams == ClipStreams.Audio) continue;  // audio-only → no video
-            if (clip.IsBroken) continue;
+            if (layer.Track.Kind == TrackKind.Audio) 
+                continue;
 
-            var f = _frames.Acquire(clip, layer.SourceTime, decodeScale);
-            if (f is not null) frames[clip.Id] = f.Value;
+            if (layer.Clip is not MediaClip clip) 
+                continue;   // GraphicsClip → painted inline
+
+            if (clip.Streams == ClipStreams.Audio) 
+                continue;  // audio-only → no video
+
+            if (clip.IsBroken) 
+                continue;
+
+            VideoFrame? f = _frames.Acquire(clip, layer.SourceTime, decodeScale);
+            if (f is not null) 
+                frames[clip.Id] = f.Value;
         }
 
         return new FrameBundle(frame, generation, layers, frames);
@@ -62,7 +70,9 @@ public sealed class ProjectBundleSource : IFrameBundleSource
 
     public void Recycle(FrameBundle bundle)
     {
-        foreach (var f in bundle.Frames.Values) _frames.Release(f);
+        foreach (VideoFrame f in bundle.Frames.Values) 
+            _frames.Release(f);
+
         bundle.Frames.Clear(); // guard against a double-recycle returning a buffer twice
     }
 

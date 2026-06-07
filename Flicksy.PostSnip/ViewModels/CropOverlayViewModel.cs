@@ -70,7 +70,7 @@ public partial class CropOverlayViewModel : ObservableObject
         IsActive = false;
         ImageWidth = imageWidth;
         ImageHeight = imageHeight;
-        var full = ImageBounds;
+        Rect full = ImageBounds;
         CommittedCrop = full;
         WorkingCrop = full;
         _editStartCrop = Rect.Empty;
@@ -97,7 +97,7 @@ public partial class CropOverlayViewModel : ObservableObject
             return;
         }
 
-        var newCrop = ClampToImage(WorkingCrop);
+        Rect newCrop = ClampToImage(WorkingCrop);
         if (newCrop.Width < MinCropSize || newCrop.Height < MinCropSize)
         {
             // Reject degenerate selections — keep the previous committed crop.
@@ -108,7 +108,7 @@ public partial class CropOverlayViewModel : ObservableObject
 
         if (!RectsEqual(newCrop, _editStartCrop))
         {
-            var before = _editStartCrop;
+            Rect before = _editStartCrop;
             CommittedCrop = newCrop;
             WorkingCrop = newCrop;
             _history?.Push(new CropCommand(this, before, newCrop));
@@ -150,7 +150,7 @@ public partial class CropOverlayViewModel : ObservableObject
     // that exiting the edit with no further changes won't push a redundant command.
     public void ApplyCommittedCrop(Rect rect)
     {
-        var clamped = ClampToImage(rect);
+        Rect clamped = ClampToImage(rect);
         CommittedCrop = clamped;
         WorkingCrop = clamped;
         if (IsActive)
@@ -167,10 +167,10 @@ public partial class CropOverlayViewModel : ObservableObject
             return Rect.Empty;
         }
 
-        var x = Math.Max(0, Math.Min(rect.X, ImageWidth));
-        var y = Math.Max(0, Math.Min(rect.Y, ImageHeight));
-        var w = Math.Max(0, Math.Min(rect.Width, ImageWidth - x));
-        var h = Math.Max(0, Math.Min(rect.Height, ImageHeight - y));
+        double x = Math.Max(0, Math.Min(rect.X, ImageWidth));
+        double y = Math.Max(0, Math.Min(rect.Y, ImageHeight));
+        double w = Math.Max(0, Math.Min(rect.Width, ImageWidth - x));
+        double h = Math.Max(0, Math.Min(rect.Height, ImageHeight - y));
         return new Rect(x, y, w, h);
     }
 

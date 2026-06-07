@@ -71,8 +71,9 @@ public partial class PostSnipWindow : Window
     {
         base.OnSourceInitialized(e);
 
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero) return;
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) 
+            return;
 
         int useDark = 1;
         if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)
@@ -85,13 +86,15 @@ public partial class PostSnipWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg != WM_MOUSEHWHEEL) return IntPtr.Zero;
+        if (msg != WM_MOUSEHWHEEL) 
+            return IntPtr.Zero;
 
         short delta = (short)((wParam.ToInt64() >> 16) & 0xFFFF);
         short screenX = (short)(lParam.ToInt64() & 0xFFFF);
         short screenY = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
 
-        if (ImageViewport.Visibility != Visibility.Visible) return IntPtr.Zero;
+        if (ImageViewport.Visibility != Visibility.Visible) 
+            return IntPtr.Zero;
 
         Point local;
         try
@@ -110,7 +113,7 @@ public partial class PostSnipWindow : Window
             return IntPtr.Zero;
         }
 
-        var pixels = (delta / 120.0) * ScrollPixelsPerWheelNotch;
+        double pixels = (delta / 120.0) * ScrollPixelsPerWheelNotch;
         PanBy(-pixels, 0);
         handled = true;
         return IntPtr.Zero;
@@ -139,7 +142,7 @@ public partial class PostSnipWindow : Window
 
     private void UpdateImageClip()
     {
-        var crop = ViewModel.CropOverlay;
+        CropOverlayViewModel crop = ViewModel.CropOverlay;
         if (!crop.HasImage || crop.IsActive || !crop.IsCropped)
         {
             ImageContent.Clip = null;
@@ -197,21 +200,22 @@ public partial class PostSnipWindow : Window
 
     private void TryAutoFit()
     {
-        var imgW = EditedImage.ActualWidth;
-        var imgH = EditedImage.ActualHeight;
-        var portW = ImageViewport.ActualWidth;
-        var portH = ImageViewport.ActualHeight;
-        if (imgW <= 0 || imgH <= 0 || portW <= 0 || portH <= 0) return;
+        double imgW = EditedImage.ActualWidth;
+        double imgH = EditedImage.ActualHeight;
+        double portW = ImageViewport.ActualWidth;
+        double portH = ImageViewport.ActualHeight;
+        if (imgW <= 0 || imgH <= 0 || portW <= 0 || portH <= 0) 
+            return;
 
-        var bounds = GetVisibleBounds(imgW, imgH);
+        Rect bounds = GetVisibleBounds(imgW, imgH);
 
-        var scale = Math.Min(portW / bounds.Width, portH / bounds.Height);
+        double scale = Math.Min(portW / bounds.Width, portH / bounds.Height);
 
         ImageScaleTransform.ScaleX = scale;
         ImageScaleTransform.ScaleY = scale;
         // Centre the visible region (cropped or full) in the viewport.
-        var centerX = bounds.X + bounds.Width / 2.0;
-        var centerY = bounds.Y + bounds.Height / 2.0;
+        double centerX = bounds.X + bounds.Width / 2.0;
+        double centerY = bounds.Y + bounds.Height / 2.0;
         ImageTranslateTransform.X = portW / 2.0 - centerX * scale;
         ImageTranslateTransform.Y = portH / 2.0 - centerY * scale;
         _autoFitPending = false;
@@ -221,14 +225,14 @@ public partial class PostSnipWindow : Window
 
     private Rect GetVisibleBounds(double imgW, double imgH)
     {
-        var crop = ViewModel?.CropOverlay;
+        CropOverlayViewModel? crop = ViewModel?.CropOverlay;
         var fallback = new Rect(0, 0, imgW, imgH);
         if (crop is null || !crop.HasImage)
         {
             return fallback;
         }
 
-        var bounds = crop.CurrentViewBounds;
+        Rect bounds = crop.CurrentViewBounds;
         if (bounds.Width <= 0 || bounds.Height <= 0)
         {
             return fallback;
@@ -241,12 +245,12 @@ public partial class PostSnipWindow : Window
     {
         if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
         {
-            var factor = e.Delta > 0 ? ZoomStep : 1.0 / ZoomStep;
+            double factor = e.Delta > 0 ? ZoomStep : 1.0 / ZoomStep;
             ZoomAt(e.GetPosition(ImageViewport), factor);
         }
         else
         {
-            var pixels = (e.Delta / 120.0) * ScrollPixelsPerWheelNotch;
+            double pixels = (e.Delta / 120.0) * ScrollPixelsPerWheelNotch;
             PanBy(0, pixels);
         }
         e.Handled = true;
@@ -254,12 +258,13 @@ public partial class PostSnipWindow : Window
 
     private void ZoomAt(Point viewportPoint, double factor)
     {
-        var oldScale = ImageScaleTransform.ScaleX;
-        var newScale = Math.Clamp(oldScale * factor, MinZoom, MaxZoom);
-        if (Math.Abs(newScale - oldScale) < 1e-9) return;
+        double oldScale = ImageScaleTransform.ScaleX;
+        double newScale = Math.Clamp(oldScale * factor, MinZoom, MaxZoom);
+        if (Math.Abs(newScale - oldScale) < 1e-9) 
+            return;
 
-        var imageX = (viewportPoint.X - ImageTranslateTransform.X) / oldScale;
-        var imageY = (viewportPoint.Y - ImageTranslateTransform.Y) / oldScale;
+        double imageX = (viewportPoint.X - ImageTranslateTransform.X) / oldScale;
+        double imageY = (viewportPoint.Y - ImageTranslateTransform.Y) / oldScale;
 
         ImageScaleTransform.ScaleX = newScale;
         ImageScaleTransform.ScaleY = newScale;
@@ -277,28 +282,29 @@ public partial class PostSnipWindow : Window
 
     private void ClampOffsets()
     {
-        var portW = ImageViewport.ActualWidth;
-        var portH = ImageViewport.ActualHeight;
-        var rawImgW = EditedImage.ActualWidth;
-        var rawImgH = EditedImage.ActualHeight;
-        if (portW <= 0 || portH <= 0 || rawImgW <= 0 || rawImgH <= 0) return;
+        double portW = ImageViewport.ActualWidth;
+        double portH = ImageViewport.ActualHeight;
+        double rawImgW = EditedImage.ActualWidth;
+        double rawImgH = EditedImage.ActualHeight;
+        if (portW <= 0 || portH <= 0 || rawImgW <= 0 || rawImgH <= 0) 
+            return;
 
-        var scale = ImageScaleTransform.ScaleX;
-        var bounds = GetVisibleBounds(rawImgW, rawImgH);
+        double scale = ImageScaleTransform.ScaleX;
+        Rect bounds = GetVisibleBounds(rawImgW, rawImgH);
 
         // Clamp so that at least ViewportEdgeMargin pixels of the visible region stay on-screen.
-        var minX = ViewportEdgeMargin - bounds.Right * scale;
-        var maxX = portW - ViewportEdgeMargin - bounds.X * scale;
+        double minX = ViewportEdgeMargin - bounds.Right * scale;
+        double maxX = portW - ViewportEdgeMargin - bounds.X * scale;
         if (minX > maxX)
         {
-            var mid = (minX + maxX) / 2.0;
+            double mid = (minX + maxX) / 2.0;
             minX = maxX = mid;
         }
-        var minY = ViewportEdgeMargin - bounds.Bottom * scale;
-        var maxY = portH - ViewportEdgeMargin - bounds.Y * scale;
+        double minY = ViewportEdgeMargin - bounds.Bottom * scale;
+        double maxY = portH - ViewportEdgeMargin - bounds.Y * scale;
         if (minY > maxY)
         {
-            var mid = (minY + maxY) / 2.0;
+            double mid = (minY + maxY) / 2.0;
             minY = maxY = mid;
         }
 
@@ -308,7 +314,8 @@ public partial class PostSnipWindow : Window
 
     private void OnImageViewportPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton != MouseButton.Middle) return;
+        if (e.ChangedButton != MouseButton.Middle) 
+            return;
 
         _isPanning = true;
         _lastPanPoint = e.GetPosition(ImageViewport);
@@ -320,15 +327,18 @@ public partial class PostSnipWindow : Window
 
     private void OnImageViewportMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_isPanning) return;
-        var current = e.GetPosition(ImageViewport);
+        if (!_isPanning) 
+            return;
+
+        Point current = e.GetPosition(ImageViewport);
         PanBy(current.X - _lastPanPoint.X, current.Y - _lastPanPoint.Y);
         _lastPanPoint = current;
     }
 
     private void OnImageViewportPreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_isPanning || e.ChangedButton != MouseButton.Middle) return;
+        if (!_isPanning || e.ChangedButton != MouseButton.Middle) 
+            return;
 
         _isPanning = false;
         ImageViewport.ReleaseMouseCapture();

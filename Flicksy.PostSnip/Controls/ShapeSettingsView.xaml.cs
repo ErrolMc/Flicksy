@@ -34,7 +34,7 @@ public partial class ShapeSettingsView : UserControl
         }
 
         child.UpdateLayout();
-        var childWidth = child.ActualWidth > 0 ? child.ActualWidth : child.DesiredSize.Width;
+        double childWidth = child.ActualWidth > 0 ? child.ActualWidth : child.DesiredSize.Width;
         popup.HorizontalOffset = (target.ActualWidth - childWidth) / 2;
     }
 }

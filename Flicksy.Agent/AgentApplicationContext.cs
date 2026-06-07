@@ -45,7 +45,7 @@ internal sealed class AgentApplicationContext : ApplicationContext
 
     private void LaunchSnipper()
     {
-        var snipperPath = ResolveSnipperExecutablePath();
+        string? snipperPath = ResolveSnipperExecutablePath();
         if (string.IsNullOrWhiteSpace(snipperPath))
         {
             ShowNotification("Flicksy.Snipper.exe was not found. Build Flicksy.Snipper first.");
@@ -73,8 +73,8 @@ internal sealed class AgentApplicationContext : ApplicationContext
 
     private static string? ResolveSnipperExecutablePath()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
+        string baseDirectory = AppContext.BaseDirectory;
+        string[] candidates = new[]
         {
             Path.Combine(baseDirectory, "Flicksy.Snipper.exe"),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "Flicksy.Snipper", "bin", "Debug", "net10.0-windows", "Flicksy.Snipper.exe")),
@@ -86,7 +86,7 @@ internal sealed class AgentApplicationContext : ApplicationContext
 
     private void LaunchVideoEditor()
     {
-        var videoEditorPath = ResolveVideoEditorExecutablePath();
+        string? videoEditorPath = ResolveVideoEditorExecutablePath();
         if (string.IsNullOrWhiteSpace(videoEditorPath))
         {
             ShowNotification("Flicksy.VideoEditor.exe was not found. Build Flicksy.VideoEditor first.");
@@ -115,8 +115,8 @@ internal sealed class AgentApplicationContext : ApplicationContext
 
     private static string? ResolveVideoEditorExecutablePath()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
+        string baseDirectory = AppContext.BaseDirectory;
+        string[] candidates = new[]
         {
             Path.Combine(baseDirectory, "Flicksy.VideoEditor.exe"),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "Flicksy.VideoEditor", "bin", "Debug", "net10.0-windows", "Flicksy.VideoEditor.exe")),

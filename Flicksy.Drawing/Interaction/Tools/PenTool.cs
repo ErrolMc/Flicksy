@@ -51,15 +51,15 @@ public sealed class PenTool : IDrawingTool
             return;
         }
 
-        var smoothed = _smoothing.Smooth(clamped);
+        Point smoothed = _smoothing.Smooth(clamped);
 
         if (_lastAppendedPoint is Point lastPoint)
         {
             // Minimum-distance gate scales with stroke thickness so thick brushes don't
             // accumulate redundant interior points.
-            var minDistance = Math.Max(1.5d, _config.StrokeThickness * 0.5d);
-            var dx = smoothed.X - lastPoint.X;
-            var dy = smoothed.Y - lastPoint.Y;
+            double minDistance = Math.Max(1.5d, _config.StrokeThickness * 0.5d);
+            double dx = smoothed.X - lastPoint.X;
+            double dy = smoothed.Y - lastPoint.Y;
             if ((dx * dx) + (dy * dy) < (minDistance * minDistance))
             {
                 return;

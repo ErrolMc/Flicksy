@@ -118,13 +118,13 @@ public partial class VideoRecordingOverlayWindow : Window
 
     private void UpdateTimerText()
     {
-        var elapsed = DateTime.UtcNow - _recordingStartedUtc;
+        TimeSpan elapsed = DateTime.UtcNow - _recordingStartedUtc;
         TimerText.Text = $"{elapsed.Minutes:00}:{elapsed.Seconds:00}";
     }
 
     private void TryExcludeWindowFromCapture()
     {
-        var handle = new WindowInteropHelper(this).Handle;
+        nint handle = new WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero)
         {
             return;

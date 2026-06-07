@@ -91,8 +91,8 @@ public sealed class ShapeItem : DrawingItem
                 return Rect.Empty;
             }
 
-            var b = Geometry.Bounds;
-            var inflate = Outline is not null ? OutlineThickness / 2.0 : 0d;
+            Rect b = Geometry.Bounds;
+            double inflate = Outline is not null ? OutlineThickness / 2.0 : 0d;
             if (inflate > 0)
             {
                 b.Inflate(inflate, inflate);
@@ -181,7 +181,7 @@ public sealed class ShapeItem : DrawingItem
             }
             case ShapeKind.Arrow:
             {
-                var g = BuildArrowGeometry(p0, p1, outlineThickness);
+                Geometry g = BuildArrowGeometry(p0, p1, outlineThickness);
                 g.Freeze();
                 return g;
             }
@@ -192,9 +192,9 @@ public sealed class ShapeItem : DrawingItem
 
     private static Geometry BuildArrowGeometry(Point start, Point end, double outlineThickness)
     {
-        var dx = end.X - start.X;
-        var dy = end.Y - start.Y;
-        var length = Math.Sqrt((dx * dx) + (dy * dy));
+        double dx = end.X - start.X;
+        double dy = end.Y - start.Y;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
         if (length <= double.Epsilon)
         {
             // Degenerate; render as a tiny line so geometry isn't empty (IsDegenerate prevents it being kept).
@@ -203,13 +203,13 @@ public sealed class ShapeItem : DrawingItem
             return g;
         }
 
-        var headLength = Math.Clamp(outlineThickness * 4.5, 12.0, Math.Max(12.0, length * 0.5));
-        var headWidth = headLength * 0.7;
+        double headLength = Math.Clamp(outlineThickness * 4.5, 12.0, Math.Max(12.0, length * 0.5));
+        double headWidth = headLength * 0.7;
 
-        var ux = dx / length;
-        var uy = dy / length;
-        var px = -uy;
-        var py = ux;
+        double ux = dx / length;
+        double uy = dy / length;
+        double px = -uy;
+        double py = ux;
 
         var shaftEnd = new Point(end.X - ux * headLength * 0.6, end.Y - uy * headLength * 0.6);
         var baseCenter = new Point(end.X - ux * headLength, end.Y - uy * headLength);

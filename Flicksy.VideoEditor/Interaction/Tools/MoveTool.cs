@@ -58,9 +58,10 @@ public sealed class MoveTool : ITimelineTool
 
     public bool OnPointerDown(Point point, TimelineHit hit, MouseButtonEventArgs e)
     {
-        if (hit.Clip is null) return false;
+        if (hit.Clip is null) 
+            return false;
 
-        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
         if (ctrl)
         {
             // Ctrl-click is a selection toggle, not a move — resolve it and don't arm a drag.
@@ -76,7 +77,8 @@ public sealed class MoveTool : ITimelineTool
         }
 
         _originalTrack = _viewModel.FindTrack(hit.Clip);
-        if (_originalTrack is null) return true;   // not on a track (shouldn't happen) — just select
+        if (_originalTrack is null) 
+            return true;   // not on a track (shouldn't happen) — just select
 
         _anchorClip = hit.Clip;
         _anchorOriginalStart = hit.Clip.TimelineStart;
@@ -85,7 +87,7 @@ public sealed class MoveTool : ITimelineTool
 
         _moved.Clear();
         _movedSet.Clear();
-        foreach (var clip in _viewModel.SelectedClips)
+        foreach (Clip clip in _viewModel.SelectedClips)
         {
             _moved.Add((clip, clip.TimelineStart));
             _movedSet.Add(clip);
@@ -100,7 +102,8 @@ public sealed class MoveTool : ITimelineTool
 
     public void OnPointerMove(Point point, MouseEventArgs e)
     {
-        if (!_active || _anchorClip is null || _currentTrack is null) return;
+        if (!_active || _anchorClip is null || _currentTrack is null) 
+            return;
 
         if (!_dragStarted)
         {
@@ -112,11 +115,12 @@ public sealed class MoveTool : ITimelineTool
             _dragStarted = true;
         }
 
-        var ppf = _surface.PixelsPerFrame;
-        if (ppf <= 0) return;
+        double ppf = _surface.PixelsPerFrame;
+        if (ppf <= 0) 
+            return;
 
-        var alt = (Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt;
-        var deltaFrames = (int)Math.Round((point.X - _grabPoint.X) / ppf);
+        bool alt = (Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt;
+        int deltaFrames = (int)Math.Round((point.X - _grabPoint.X) / ppf);
 
         if (_isSingle)
         {
@@ -130,9 +134,13 @@ public sealed class MoveTool : ITimelineTool
 
     public void OnPointerUp(Point point, MouseButtonEventArgs e)
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
+
         _surface.ReleasePointer();
-        if (_dragStarted) CommitMove();
+        if (_dragStarted) 
+            CommitMove();
+
         ResetGesture();
     }
 
@@ -146,25 +154,29 @@ public sealed class MoveTool : ITimelineTool
 
     public void Cancel()
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
+
         _surface.ReleasePointer();
-        if (_dragStarted) RevertMove();
+        if (_dragStarted) 
+            RevertMove();
+
         ResetGesture();
     }
 
     private void MoveSingle(Point point, int desiredStart, bool alt)
     {
-        var clip = _anchorClip!;
+        Clip clip = _anchorClip!;
 
         // Resolve the track under the cursor; fall back to the current track when the target is
         // off-stack, locked, or a different kind (cross-track move is same-kind only).
-        var targetTrack = _surface.HitTest(point).Track;
+        Track? targetTrack = _surface.HitTest(point).Track;
         if (targetTrack is null || !_viewModel.CanMoveToTrack(clip, targetTrack))
         {
             targetTrack = _currentTrack;
         }
 
-        var clampedStart = _viewModel.Snap(desiredStart, targetTrack!, clip.Duration, alt, _movedSet);
+        int clampedStart = _viewModel.Snap(desiredStart, targetTrack!, clip.Duration, alt, _movedSet);
 
         if (!ReferenceEquals(targetTrack, _currentTrack))
         {
@@ -179,17 +191,17 @@ public sealed class MoveTool : ITimelineTool
 
     private void MoveGroup(int deltaFrames, bool alt)
     {
-        var delta = deltaFrames;
+        int delta = deltaFrames;
         if (!alt)
         {
             // Snap the grabbed clip's start edge to a static target; the whole group inherits the
             // resulting delta so spacing is preserved.
-            var snappedAnchor = _viewModel.SnapStartEdge(_anchorOriginalStart + delta, _movedSet);
+            int snappedAnchor = _viewModel.SnapStartEdge(_anchorOriginalStart + delta, _movedSet);
             delta = snappedAnchor - _anchorOriginalStart;
         }
 
         delta = _viewModel.ClampGroupDelta(_moved, delta);
-        foreach (var (clip, originalStart) in _moved)
+        foreach ((Clip clip, int originalStart) in _moved)
         {
             clip.TimelineStart = Math.Max(0, originalStart + delta);
         }
@@ -197,11 +209,11 @@ public sealed class MoveTool : ITimelineTool
 
     private void CommitMove()
     {
-        var clip = _anchorClip!;
+        Clip clip = _anchorClip!;
         if (_isSingle)
         {
-            var finalTrack = _currentTrack!;
-            var finalStart = clip.TimelineStart;
+            Track finalTrack = _currentTrack!;
+            int finalStart = clip.TimelineStart;
             if (!ReferenceEquals(finalTrack, _originalTrack))
             {
                 _viewModel.History.Push(new MoveClipBetweenTracksCommand(
@@ -215,7 +227,7 @@ public sealed class MoveTool : ITimelineTool
         }
 
         var children = new List<IUndoableCommand>();
-        foreach (var (c, originalStart) in _moved)
+        foreach ((Clip c, int originalStart) in _moved)
         {
             if (c.TimelineStart != originalStart)
             {
@@ -230,7 +242,7 @@ public sealed class MoveTool : ITimelineTool
 
     private void RevertMove()
     {
-        var clip = _anchorClip!;
+        Clip clip = _anchorClip!;
         if (_isSingle)
         {
             if (!ReferenceEquals(_currentTrack, _originalTrack) && _originalTrack is not null)
@@ -244,7 +256,7 @@ public sealed class MoveTool : ITimelineTool
             return;
         }
 
-        foreach (var (c, originalStart) in _moved)
+        foreach ((Clip c, int originalStart) in _moved)
         {
             c.TimelineStart = originalStart;
         }

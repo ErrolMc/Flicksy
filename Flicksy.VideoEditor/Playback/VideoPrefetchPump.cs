@@ -85,7 +85,9 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     {
         lock (_gate)
         {
-            if (_running) return;
+            if (_running) 
+                return;
+
             _generation++;
             _nextFrame = Math.Max(0, fromFrame);
             _lastConsumerFrame = _nextFrame;
@@ -99,7 +101,11 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     /// <summary>Whether the producer thread is currently prefetching. UI thread.</summary>
     public bool IsRunning
     {
-        get { lock (_gate) return _running; }
+        get 
+        { 
+            lock (_gate) 
+                return _running; 
+        }
     }
 
     /// <summary>
@@ -112,7 +118,9 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
         Thread? t;
         lock (_gate)
         {
-            if (!_running) return;
+            if (!_running) 
+                return;
+
             _running = false;
             t = _thread;
             _thread = null;
@@ -131,7 +139,9 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     public void SeekTo(int frame)
     {
         double scale;
-        lock (_gate) scale = _scale;
+        lock (_gate) 
+            scale = _scale;
+
         Reprime(frame, scale);
     }
 
@@ -153,12 +163,14 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
             Monitor.PulseAll(_gate);
         }
 
-        foreach (var b in dropped) _source.Recycle(b);
+        foreach (FrameBundle b in dropped) 
+            _source.Recycle(b);
 
         // _current is UI-thread-only; recycle + clear it too (usually already null between ticks).
-        var cur = _current;
+        FrameBundle? cur = _current;
         _current = null;
-        if (cur is not null) _source.Recycle(cur);
+        if (cur is not null) 
+            _source.Recycle(cur);
     }
 
     /// <summary>
@@ -169,8 +181,10 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     /// </summary>
     public void Prefetch(int fromFrame, double decodeScale)
     {
-        if (IsRunning) Reprime(fromFrame, decodeScale);
-        else Start(fromFrame, decodeScale);
+        if (IsRunning) 
+            Reprime(fromFrame, decodeScale);
+        else 
+            Start(fromFrame, decodeScale);
     }
 
     // ---- Consumer (UI thread) ----------------------------------------------
@@ -215,12 +229,14 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
                 FrameBundle? chosen = null;
                 while (_queue.Count > 0 && _queue.Peek().Frame <= frame)
                 {
-                    if (chosen is not null) (dropped ??= new List<FrameBundle>()).Add(chosen);
+                    if (chosen is not null) 
+                        (dropped ??= new List<FrameBundle>()).Add(chosen);
                     chosen = _queue.Dequeue();
                 }
 
                 hit = chosen is not null;
-                if (hit) _current = chosen;
+                if (hit) 
+                    _current = chosen;
 
                 Monitor.Pulse(_gate); // freed slot(s) → let the producer run
             }
@@ -228,7 +244,8 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
 
         if (dropped is not null)
         {
-            foreach (var b in dropped) _source.Recycle(b);
+            foreach (FrameBundle b in dropped) 
+                _source.Recycle(b);
         }
 
         return hit;
@@ -236,9 +253,10 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
 
     public void EndFrame()
     {
-        var done = _current; // UI-thread-only
+        FrameBundle? done = _current; // UI-thread-only
         _current = null;
-        if (done is not null) _source.Recycle(done);
+        if (done is not null) 
+            _source.Recycle(done);
     }
 
     /// <summary>
@@ -262,7 +280,7 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     {
         // Serve the pre-decoded frame for the claimed bundle. sourceTime/decodeScale are ignored —
         // the bundle is already the right frame at the right scale (chosen in BeginFrame).
-        var current = _current;
+        FrameBundle? current = _current;
         if (current is not null && current.Frames.TryGetValue(clip.Id, out var frame))
         {
             return frame;
@@ -299,7 +317,9 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
                 {
                     Monitor.Wait(_gate, ProducerIdleWaitMs);
                 }
-                if (!_running) return;
+
+                if (!_running) 
+                    return;
 
                 gen = _generation;
                 frame = _nextFrame;
@@ -327,7 +347,8 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
                 }
 
                 // Stale epoch (a seek raced past) or stopped → the bundle's buffers are ours to return.
-                if (!enqueued) _source.Recycle(bundle);
+                if (!enqueued) 
+                    _source.Recycle(bundle);
             }
         }
     }
@@ -338,7 +359,9 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     private List<FrameBundle> DrainQueueLocked()
     {
         var list = new List<FrameBundle>(_queue.Count);
-        while (_queue.Count > 0) list.Add(_queue.Dequeue());
+        while (_queue.Count > 0) 
+            list.Add(_queue.Dequeue());
+
         return list;
     }
 
@@ -349,16 +372,21 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
         {
             dropped = DrainQueueLocked();
         }
-        foreach (var b in dropped) _source.Recycle(b);
 
-        var cur = _current;
+        foreach (FrameBundle b in dropped) 
+            _source.Recycle(b);
+
+        FrameBundle? cur = _current;
         _current = null;
-        if (cur is not null) _source.Recycle(cur);
+        if (cur is not null) 
+            _source.Recycle(cur);
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed) 
+            return;
+
         _disposed = true;
         Stop();              // joins the producer thread + drains the queue
         _source.Dispose();   // only now is it safe to dispose the decoder cache (no decode in flight)

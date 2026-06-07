@@ -66,7 +66,8 @@ public sealed class MarqueeTool : ITimelineTool
 
     public void OnPointerMove(Point point, MouseEventArgs e)
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
 
         if (!_dragStarted)
         {
@@ -78,14 +79,16 @@ public sealed class MarqueeTool : ITimelineTool
             _dragStarted = true;
         }
 
-        var rect = BuildRect(_anchor, point);
+        Rect rect = BuildRect(_anchor, point);
         _surface.ShowMarquee(rect);
         ApplySelection(rect);
     }
 
     public void OnPointerUp(Point point, MouseButtonEventArgs e)
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
+
         _surface.ReleasePointer();
         _surface.HideMarquee();
 
@@ -112,7 +115,9 @@ public sealed class MarqueeTool : ITimelineTool
 
     public void Cancel()
     {
-        if (!_active) return;
+        if (!_active) 
+            return;
+
         _surface.ReleasePointer();
         _surface.HideMarquee();
         if (_dragStarted)
@@ -127,7 +132,7 @@ public sealed class MarqueeTool : ITimelineTool
 
     private void ApplySelection(Rect rect)
     {
-        var hits = TimelineHitTester.ClipsIntersecting(
+        IReadOnlyList<Clip> hits = TimelineHitTester.ClipsIntersecting(
             rect.Left, rect.Top, rect.Width, rect.Height,
             _viewModel.Project.Tracks, _surface.PixelsPerFrame, _surface.TrackHeight);
 
@@ -138,9 +143,10 @@ public sealed class MarqueeTool : ITimelineTool
             // Union the band's hits onto the selection that existed when the drag began, keeping its
             // primary stable so the right rail / inspector don't thrash mid-drag.
             target = new List<Clip>(_baseSelection);
-            foreach (var clip in hits)
+            foreach (Clip clip in hits)
             {
-                if (!target.Contains(clip)) target.Add(clip);
+                if (!target.Contains(clip)) 
+                    target.Add(clip);
             }
             primary = _basePrimary;
         }
@@ -150,17 +156,22 @@ public sealed class MarqueeTool : ITimelineTool
             primary = null;   // SetSelection picks the first (top-left-most) hit as primary
         }
 
-        if (SelectionUnchanged(target)) return;   // skip redundant rebuilds on moves that don't change membership
+        if (SelectionUnchanged(target)) 
+            return;   // skip redundant rebuilds on moves that don't change membership
+
         _applied = new HashSet<Clip>(target);
         _viewModel.SetSelection(target, primary);
     }
 
     private bool SelectionUnchanged(List<Clip> target)
     {
-        if (_applied is null || _applied.Count != target.Count) return false;
-        foreach (var clip in target)
+        if (_applied is null || _applied.Count != target.Count) 
+            return false;
+
+        foreach (Clip clip in target)
         {
-            if (!_applied.Contains(clip)) return false;
+            if (!_applied.Contains(clip)) 
+                return false;
         }
         return true;
     }

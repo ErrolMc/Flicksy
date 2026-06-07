@@ -33,7 +33,7 @@ public partial class ImageEditToolsView : UserControl
             // Done BEFORE BeginTextStyleEdit so the snapshot captures the item's real state
             // (the sync writes the same values back via the existing cascade — TextItem's
             // SetProperty guards short-circuit no-op writes).
-            if (DataContext is ViewModels.ImageEditToolsViewModel tools)
+            if (DataContext is ImageEditToolsViewModel tools)
             {
                 tools.TextSettings.SyncFromTextItem(textItem);
             }
@@ -88,7 +88,7 @@ public partial class ImageEditToolsView : UserControl
         }
 
         child.UpdateLayout();
-        var childWidth = child.ActualWidth > 0 ? child.ActualWidth : child.DesiredSize.Width;
+        double childWidth = child.ActualWidth > 0 ? child.ActualWidth : child.DesiredSize.Width;
         popup.HorizontalOffset = (target.ActualWidth - childWidth) / 2;
     }
 }

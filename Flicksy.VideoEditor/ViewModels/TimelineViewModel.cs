@@ -102,13 +102,13 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void SetSelection(IEnumerable<Clip> clips, Clip? primary = null)
     {
-        var distinct = clips?.Distinct().ToList() ?? new List<Clip>();
+        List<Clip> distinct = clips?.Distinct().ToList() ?? new List<Clip>();
 
         _syncingSelection = true;
         try
         {
             SelectedClips.Clear();
-            foreach (var clip in distinct)
+            foreach (Clip clip in distinct)
             {
                 SelectedClips.Add(clip);
             }
@@ -128,7 +128,8 @@ public partial class TimelineViewModel : ObservableObject
     // SetSelection is mid-update so a multi-select isn't collapsed to its primary.
     partial void OnSelectedClipChanged(Clip? value)
     {
-        if (_syncingSelection) return;
+        if (_syncingSelection) 
+            return;
 
         SelectedClips.Clear();
         if (value is not null)
@@ -144,7 +145,8 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void ToggleSelection(Clip clip)
     {
-        if (clip is null) return;
+        if (clip is null) 
+            return;
 
         _syncingSelection = true;
         try
@@ -177,7 +179,8 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void Deselect(Clip clip)
     {
-        if (clip is null || !SelectedClips.Contains(clip)) return;
+        if (clip is null || !SelectedClips.Contains(clip)) 
+            return;
 
         _syncingSelection = true;
         try
@@ -201,7 +204,9 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void ZoomBy(double factor)
     {
-        if (factor <= 0 || double.IsNaN(factor) || double.IsInfinity(factor)) return;
+        if (factor <= 0 || double.IsNaN(factor) || double.IsInfinity(factor)) 
+            return;
+
         PixelsPerFrame = Math.Clamp(PixelsPerFrame * factor, MinPixelsPerFrame, MaxPixelsPerFrame);
     }
 
@@ -212,7 +217,7 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void SeekToFrame(int frame)
     {
-        var max = Math.Max(0, Transport.TotalFrames);
+        int max = Math.Max(0, Transport.TotalFrames);
         Transport.Playhead = Math.Clamp(frame, 0, max);
     }
 
@@ -221,7 +226,9 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void SeekToPixel(double laneX)
     {
-        if (PixelsPerFrame <= 0) return;
+        if (PixelsPerFrame <= 0) 
+            return;
+
         SeekToFrame((int)Math.Round(laneX / PixelsPerFrame));
     }
 
@@ -242,7 +249,7 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public int Snap(int landingFrame, Track targetTrack, int draggedDuration, bool altHeld, IReadOnlyCollection<Clip>? excludeClips = null)
     {
-        var frame = Math.Max(0, landingFrame);
+        int frame = Math.Max(0, landingFrame);
 
         if (!altHeld && PixelsPerFrame > 0)
         {
@@ -261,7 +268,7 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public int SnapStartEdge(int desiredStart, IReadOnlyCollection<Clip>? excludeClips = null)
     {
-        var frame = Math.Max(0, desiredStart);
+        int frame = Math.Max(0, desiredStart);
         if (PixelsPerFrame > 0)
         {
             frame = ApplyEdgeSnap(frame, excludeClips);
@@ -274,13 +281,13 @@ public partial class TimelineViewModel : ObservableObject
     // where the clip already is.
     private int ApplyEdgeSnap(int frame, IReadOnlyCollection<Clip>? excludeClips)
     {
-        var snapRadiusFrames = SnapRadiusPixels / PixelsPerFrame;
-        var best = frame;
-        var bestDelta = snapRadiusFrames;
+        double snapRadiusFrames = SnapRadiusPixels / PixelsPerFrame;
+        int best = frame;
+        double bestDelta = snapRadiusFrames;
 
         void Consider(int candidate)
         {
-            var delta = Math.Abs(candidate - frame);
+            int delta = Math.Abs(candidate - frame);
             if (delta < bestDelta)
             {
                 bestDelta = delta;
@@ -288,11 +295,13 @@ public partial class TimelineViewModel : ObservableObject
             }
         }
 
-        foreach (var track in Project.Tracks)
+        foreach (Track track in Project.Tracks)
         {
-            foreach (var clip in track.Clips)
+            foreach (Clip clip in track.Clips)
             {
-                if (excludeClips is not null && excludeClips.Contains(clip)) continue;
+                if (excludeClips is not null && excludeClips.Contains(clip)) 
+                    continue;
+
                 Consider(clip.TimelineStart);
                 Consider(clip.TimelineStart + clip.Duration);
             }
@@ -314,7 +323,7 @@ public partial class TimelineViewModel : ObservableObject
             return Math.Max(0, desiredStart);
         }
 
-        var occupied = targetTrack.Clips
+        List<(int Start, int End)> occupied = targetTrack.Clips
             .Where(c => excludeClips is null || !excludeClips.Contains(c))
             .Select(c => (Start: c.TimelineStart, End: c.TimelineStart + Math.Max(1, c.Duration)))
             .OrderBy(i => i.Start)
@@ -325,8 +334,8 @@ public partial class TimelineViewModel : ObservableObject
             return Math.Max(0, desiredStart);
         }
 
-        var desiredEnd = desiredStart + draggedDuration;
-        var overlaps = occupied.Any(i => desiredStart < i.End && i.Start < desiredEnd);
+        int desiredEnd = desiredStart + draggedDuration;
+        bool overlaps = occupied.Any(i => desiredStart < i.End && i.Start < desiredEnd);
         if (!overlaps)
         {
             return Math.Max(0, desiredStart);
@@ -334,26 +343,26 @@ public partial class TimelineViewModel : ObservableObject
 
         var candidates = new List<int>();
 
-        var leadEnd = occupied[0].Start;
+        int leadEnd = occupied[0].Start;
         if (leadEnd >= draggedDuration)
         {
-            var maxPlacement = leadEnd - draggedDuration;
+            int maxPlacement = leadEnd - draggedDuration;
             candidates.Add(Math.Clamp(desiredStart, 0, maxPlacement));
         }
 
-        for (var i = 0; i < occupied.Count - 1; i++)
+        for (int i = 0; i < occupied.Count - 1; i++)
         {
-            var gapStart = occupied[i].End;
-            var gapEnd = occupied[i + 1].Start;
+            int gapStart = occupied[i].End;
+            int gapEnd = occupied[i + 1].Start;
             if (gapEnd - gapStart >= draggedDuration)
             {
-                var maxPlacement = gapEnd - draggedDuration;
+                int maxPlacement = gapEnd - draggedDuration;
                 candidates.Add(Math.Clamp(desiredStart, gapStart, maxPlacement));
             }
         }
 
         // Tail gap is unbounded — guarantees a valid placement always exists.
-        var tailStart = occupied[^1].End;
+        int tailStart = occupied[^1].End;
         candidates.Add(Math.Max(tailStart, desiredStart));
 
         return candidates.OrderBy(c => Math.Abs(c - desiredStart)).First();
@@ -371,56 +380,70 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public int ClampGroupDelta(IReadOnlyList<(Clip Clip, int OriginalStart)> moved, int desiredDelta)
     {
-        if (moved is null || moved.Count == 0) return 0;
+        if (moved is null || moved.Count == 0) 
+            return 0;
 
         var movedSet = new HashSet<Clip>(moved.Count);
-        foreach (var m in moved) movedSet.Add(m.Clip);
+        foreach ((Clip clip, _) in moved) 
+            movedSet.Add(clip);
 
         // Frame-0 floor: the earliest-starting moved clip can't be pushed before 0.
         var minStart = int.MaxValue;
-        foreach (var (_, originalStart) in moved) minStart = Math.Min(minStart, originalStart);
-        var lowerBound = -minStart;
+        foreach ((_, int originalStart) in moved) 
+            minStart = Math.Min(minStart, originalStart);
+
+        int lowerBound = -minStart;
 
         // Each (moved clip, static neighbour on the same track) pair forbids an open delta
         // interval: the moved span [s+d, e+d) overlaps the static [a, b) exactly when
         // d is in (a - e, b - s). Endpoints are allowed (edges touching is non-overlapping).
         var forbidden = new List<(int Lo, int Hi)>();
-        foreach (var (clip, originalStart) in moved)
+        foreach ((Clip clip, int originalStart) in moved)
         {
-            var track = FindTrack(clip);
-            if (track is null) continue;
+            Track? track = FindTrack(clip);
+            if (track is null) 
+                continue;
 
-            var start = originalStart;
-            var end = originalStart + Math.Max(1, clip.Duration);
-            foreach (var other in track.Clips)
+            int start = originalStart;
+            int end = originalStart + Math.Max(1, clip.Duration);
+            foreach (Clip other in track.Clips)
             {
-                if (movedSet.Contains(other)) continue;   // static neighbours only
-                var otherStart = other.TimelineStart;
-                var otherEnd = other.TimelineStart + Math.Max(1, other.Duration);
+                if (movedSet.Contains(other)) 
+                    continue;   // static neighbours only
+
+                int otherStart = other.TimelineStart;
+                int otherEnd = other.TimelineStart + Math.Max(1, other.Duration);
                 forbidden.Add((otherStart - end, otherEnd - start));
             }
         }
 
         bool IsValid(int d)
         {
-            if (d < lowerBound) return false;
-            foreach (var (lo, hi) in forbidden)
+            if (d < lowerBound) 
+                return false;
+
+            foreach ((int lo, int hi) in forbidden)
             {
-                if (lo < d && d < hi) return false;
+                if (lo < d && d < hi) 
+                    return false;
             }
             return true;
         }
 
-        if (IsValid(desiredDelta)) return desiredDelta;
+        if (IsValid(desiredDelta)) 
+            return desiredDelta;
 
         // Otherwise the nearest valid delta sits on a constraint boundary: the frame-0 floor, the
         // original layout (delta 0, always overlap-free), or an edge of a forbidden interval.
-        var best = 0;
-        var bestDistance = Math.Abs((long)desiredDelta);
+        int best = 0;
+        long bestDistance = Math.Abs((long)desiredDelta);
+
         void Consider(int d)
         {
-            if (!IsValid(d)) return;
-            var distance = Math.Abs((long)d - desiredDelta);
+            if (!IsValid(d)) 
+                return;
+
+            long distance = Math.Abs((long)d - desiredDelta);
             if (distance < bestDistance)
             {
                 bestDistance = distance;
@@ -429,7 +452,7 @@ public partial class TimelineViewModel : ObservableObject
         }
 
         Consider(lowerBound);
-        foreach (var (lo, hi) in forbidden)
+        foreach ((int lo, int hi) in forbidden)
         {
             Consider(lo);
             Consider(hi);
@@ -444,17 +467,20 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public bool CanMoveToTrack(Clip clip, Track target)
     {
-        if (clip is null || target is null || target.Locked) return false;
-        var current = FindTrack(clip);
+        if (clip is null || target is null || target.Locked) 
+            return false;
+
+        Track? current = FindTrack(clip);
         return current is not null && current.Kind == target.Kind;
     }
 
     /// <summary>The track that currently holds <paramref name="clip"/>, or null if none does.</summary>
     public Track? FindTrack(Clip clip)
     {
-        foreach (var track in Project.Tracks)
+        foreach (Track track in Project.Tracks)
         {
-            if (track.Clips.Contains(clip)) return track;
+            if (track.Clips.Contains(clip)) 
+                return track;
         }
         return null;
     }
@@ -467,7 +493,7 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void MoveClipToTrack(Clip clip, Track toTrack, int newStart)
     {
-        var current = FindTrack(clip);
+        Track? current = FindTrack(clip);
         current?.Clips.Remove(clip);
         clip.TimelineStart = Math.Max(0, newStart);
         InsertSorted(toTrack, clip);
@@ -482,7 +508,7 @@ public partial class TimelineViewModel : ObservableObject
 
     private static void InsertSorted(Track track, Clip clip)
     {
-        var insertIdx = track.Clips.Count;
+        int insertIdx = track.Clips.Count;
         for (var i = 0; i < track.Clips.Count; i++)
         {
             if (track.Clips[i].TimelineStart > clip.TimelineStart)
@@ -510,27 +536,28 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public TrimResult ResolveTrim(MediaClip clip, bool fromLeftEdge, int desiredEdgeFrame)
     {
-        var start = clip.TimelineStart;
-        var duration = clip.Duration;
+        int start = clip.TimelineStart;
+        int duration = clip.Duration;
 
         // A degenerate (zero-length) clip has no edge worth trimming; leaving it untouched also
         // keeps the clamps below from inverting (lower > upper).
-        if (duration < 1) return TrimResult.Capture(clip);
+        if (duration < 1) 
+            return TrimResult.Capture(clip);
 
-        var end = start + duration;
-        var track = FindTrack(clip);
-        var canExtend = !clip.IsBroken;
-        var source = Project.MediaSources.FirstOrDefault(s => s.Id == clip.MediaSourceId) ?? clip.Source;
+        int end = start + duration;
+        Track? track = FindTrack(clip);
+        bool canExtend = !clip.IsBroken;
+        MediaSource? source = Project.MediaSources.FirstOrDefault(s => s.Id == clip.MediaSourceId) ?? clip.Source;
 
         // Source seconds spanned by one timeline frame at this clip's speed. Speed and Framerate
         // are both > 0 here (otherwise Duration would be 0 and we returned above).
-        var sourcePerFrame = clip.Speed / clip.Framerate;
+        double sourcePerFrame = clip.Speed / clip.Framerate;
 
         if (fromLeftEdge)
         {
             // Left (in-point): the start slides, the right edge stays put, SourceIn shifts with it.
-            var upper = end - 1;                                   // 1-frame minimum
-            var lower = Math.Max(0, PrevClipEnd(track, clip, start));
+            int upper = end - 1;                                   // 1-frame minimum
+            int lower = Math.Max(0, PrevClipEnd(track, clip, start));
             if (!canExtend)
             {
                 lower = Math.Max(lower, start);                    // shrink only
@@ -538,20 +565,22 @@ public partial class TimelineViewModel : ObservableObject
             else
             {
                 // SourceIn can't drop below zero: cap how far left the start may slide.
-                var maxLeftFrames = (int)Math.Floor(clip.SourceIn.TotalSeconds / sourcePerFrame + FrameEpsilon);
+                int maxLeftFrames = (int)Math.Floor(clip.SourceIn.TotalSeconds / sourcePerFrame + FrameEpsilon);
                 lower = Math.Max(lower, start - maxLeftFrames);
             }
 
-            var newStart = Math.Clamp(desiredEdgeFrame, lower, upper);
-            var newSourceIn = clip.SourceIn + TimeSpan.FromSeconds((newStart - start) * sourcePerFrame);
-            if (newSourceIn < TimeSpan.Zero) newSourceIn = TimeSpan.Zero;   // float guard
+            int newStart = Math.Clamp(desiredEdgeFrame, lower, upper);
+            TimeSpan newSourceIn = clip.SourceIn + TimeSpan.FromSeconds((newStart - start) * sourcePerFrame);
+            if (newSourceIn < TimeSpan.Zero) 
+                newSourceIn = TimeSpan.Zero;   // float guard
+
             return new TrimResult(newStart, newSourceIn, clip.SourceOut);
         }
         else
         {
             // Right (out-point): the end slides, start + SourceIn stay put, SourceOut shifts.
-            var lower = start + 1;                                 // 1-frame minimum
-            var upper = NextClipStart(track, clip, end);           // neighbour, or no timeline cap
+            int lower = start + 1;                                 // 1-frame minimum
+            int upper = NextClipStart(track, clip, end);           // neighbour, or no timeline cap
             if (!canExtend)
             {
                 upper = Math.Min(upper, end);                      // shrink only
@@ -559,13 +588,16 @@ public partial class TimelineViewModel : ObservableObject
             else if (source is not null)
             {
                 // SourceOut can't exceed the source length: cap how far right the end may slide.
-                var headroomFrames = (int)Math.Floor((source.Duration - clip.SourceOut).TotalSeconds / sourcePerFrame + FrameEpsilon);
+                int headroomFrames = (int)Math.Floor((source.Duration - clip.SourceOut).TotalSeconds / sourcePerFrame + FrameEpsilon);
                 upper = Math.Min(upper, end + Math.Max(0, headroomFrames));
             }
 
-            var newEnd = Math.Clamp(desiredEdgeFrame, lower, upper);
-            var newSourceOut = clip.SourceOut + TimeSpan.FromSeconds((newEnd - end) * sourcePerFrame);
-            if (source is not null && newSourceOut > source.Duration) newSourceOut = source.Duration;   // float guard
+            int newEnd = Math.Clamp(desiredEdgeFrame, lower, upper);
+            TimeSpan newSourceOut = clip.SourceOut + TimeSpan.FromSeconds((newEnd - end) * sourcePerFrame);
+
+            if (source is not null && newSourceOut > source.Duration) 
+                newSourceOut = source.Duration;   // float guard
+
             return new TrimResult(start, clip.SourceIn, newSourceOut);
         }
     }
@@ -575,13 +607,19 @@ public partial class TimelineViewModel : ObservableObject
     // left edge can't be trimmed before the track origin regardless.
     private static int PrevClipEnd(Track? track, Clip clip, int start)
     {
-        if (track is null) return 0;
-        var best = 0;
+        if (track is null) 
+            return 0;
+
+        int best = 0;
         foreach (var c in track.Clips)
         {
-            if (ReferenceEquals(c, clip)) continue;
-            var cEnd = c.TimelineStart + Math.Max(1, c.Duration);
-            if (cEnd <= start && cEnd > best) best = cEnd;
+            if (ReferenceEquals(c, clip)) 
+                continue;
+
+            int cEnd = c.TimelineStart + Math.Max(1, c.Duration);
+
+            if (cEnd <= start && cEnd > best) 
+                best = cEnd;
         }
         return best;
     }
@@ -590,13 +628,18 @@ public partial class TimelineViewModel : ObservableObject
     // there's no right neighbour (no timeline cap — the source bound then governs).
     private static int NextClipStart(Track? track, Clip clip, int end)
     {
-        if (track is null) return int.MaxValue;
+        if (track is null) 
+            return int.MaxValue;
+
         var best = int.MaxValue;
-        foreach (var c in track.Clips)
+        foreach (Clip c in track.Clips)
         {
-            if (ReferenceEquals(c, clip)) continue;
-            var cStart = c.TimelineStart;
-            if (cStart >= end && cStart < best) best = cStart;
+            if (ReferenceEquals(c, clip)) 
+                continue;
+
+            int cStart = c.TimelineStart;
+            if (cStart >= end && cStart < best) 
+                best = cStart;
         }
         return best;
     }
@@ -621,26 +664,29 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void DetachAudio(MediaClip clip)
     {
-        if (clip.Streams != ClipStreams.Both) return;
+        if (clip.Streams != ClipStreams.Both) 
+            return;
 
-        var sourceTrack = FindTrack(clip);
-        if (sourceTrack is null || sourceTrack.Locked) return;   // locked tracks are inert (ADR 0006)
+        Track? sourceTrack = FindTrack(clip);
+        if (sourceTrack is null || sourceTrack.Locked) 
+            return;   // locked tracks are inert (ADR 0006)
 
         // Resolve the source by id (per ADR 0003: never trust the denormalized Source ref).
         // Fallback to the local ref so a clip wired before id-lookup works (e.g. tests).
-        var source = Project.MediaSources.FirstOrDefault(s => s.Id == clip.MediaSourceId)
+        MediaSource? source = Project.MediaSources.FirstOrDefault(s => s.Id == clip.MediaSourceId)
                      ?? clip.Source;
 
         // Walk Audio 2, Audio 3, … picking the first name not already taken. Starts at 2
         // by convention — the bare "Audio" track is the default empty one and is never
         // overwritten even if the user has renamed it away.
-        var n = 2;
+        int n = 2;
         string trackName;
         do
         {
             trackName = $"Audio {n}";
             n++;
-        } while (Project.Tracks.Any(t => string.Equals(t.Name, trackName, StringComparison.Ordinal)));
+        } 
+        while (Project.Tracks.Any(t => string.Equals(t.Name, trackName, StringComparison.Ordinal)));
 
         // No literal Name stamp — MediaClip.DisplayName auto-derives "<source> (Audio)"
         // from the audio-half shape (Streams=Audio over a HasVideo source), so the label
@@ -661,7 +707,7 @@ public partial class TimelineViewModel : ObservableObject
         // Mutate live (push-after-mutate convention), then bundle the inverse of each step into one
         // undo entry. Three granular commands rather than a single "detach" command so a future
         // detach-onto-an-existing-track can keep the clip add + stream flip and drop the track add.
-        var trackIndex = Project.Tracks.Count;   // appended at the end
+        int trackIndex = Project.Tracks.Count;   // appended at the end
         Project.Tracks.Add(audioTrack);
         audioTrack.Clips.Add(audioClip);
         clip.Streams = ClipStreams.Video;
@@ -697,7 +743,9 @@ public partial class TimelineViewModel : ObservableObject
     public void SplitClipAt(MediaClip clip, int frame)
     {
         var command = CreateSplit(clip, frame);
-        if (command is null) return;
+        if (command is null) 
+            return;
+
         History.Push(command);
         SelectedClip = clip;   // the original is now the left half
     }
@@ -714,12 +762,13 @@ public partial class TimelineViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSplitSelected))]
     private void SplitSelectedAtPlayhead()
     {
-        var frame = Transport.Playhead;
+        int frame = Transport.Playhead;
         var commands = new List<IUndoableCommand>();
-        foreach (var clip in SelectedClips.OfType<MediaClip>().ToList())
+        foreach (MediaClip clip in SelectedClips.OfType<MediaClip>().ToList())
         {
-            var command = CreateSplit(clip, frame);
-            if (command is not null) commands.Add(command);
+            SplitClipCommand? command = CreateSplit(clip, frame);
+            if (command is not null) 
+                commands.Add(command);
         }
         PushBundle(commands);
     }
@@ -736,19 +785,23 @@ public partial class TimelineViewModel : ObservableObject
     private void DeleteSelected()
     {
         var commands = new List<IUndoableCommand>();
-        foreach (var clip in SelectedClips.ToList())
+        foreach (Clip clip in SelectedClips.ToList())
         {
             var track = FindTrack(clip);
-            if (track is null || track.Locked) continue;   // locked tracks are inert (ADR 0006)
+            if (track is null || track.Locked) 
+                continue;   // locked tracks are inert (ADR 0006)
 
-            var before = track.Transitions.ToList();
+            List<Transition> before = track.Transitions.ToList();
             track.RemoveTransitionsFor(clip);
             track.Clips.Remove(clip);
-            var after = track.Transitions.ToList();
+
+            List<Transition> after = track.Transitions.ToList();
             commands.Add(new RemoveClipCommand(this, track, clip, before, after));
         }
 
-        if (commands.Count == 0) return;
+        if (commands.Count == 0) 
+            return;
+
         SetSelection(Array.Empty<Clip>());
         PushBundle(commands);
     }
@@ -758,18 +811,20 @@ public partial class TimelineViewModel : ObservableObject
     // reassign to the new right half while left-edge ones stay put (Track.ReassignTransitionsForSplit).
     private SplitClipCommand? CreateSplit(MediaClip clip, int frame)
     {
-        var track = FindTrack(clip);
-        if (track is null || track.Locked) return null;
+        Track? track = FindTrack(clip);
+        if (track is null || track.Locked) 
+            return null;
 
-        var start = clip.TimelineStart;
-        var duration = clip.Duration;
-        if (frame <= start || frame >= start + duration) return null;   // strictly inside → both halves >= 1 frame
+        int start = clip.TimelineStart;
+        int duration = clip.Duration;
+        if (frame <= start || frame >= start + duration) 
+            return null;   // strictly inside → both halves >= 1 frame
 
-        var sourceOutBefore = clip.SourceOut;
+        TimeSpan sourceOutBefore = clip.SourceOut;
 
         // Source time at the split frame via the speed mapping (matches CompositionPlanner.ComputeSourceTime).
-        var elapsedFrames = frame - start;
-        var splitSourceTime = clip.SourceIn + TimeSpan.FromSeconds(elapsedFrames * clip.Speed / clip.Framerate);
+        int elapsedFrames = frame - start;
+        TimeSpan splitSourceTime = clip.SourceIn + TimeSpan.FromSeconds(elapsedFrames * clip.Speed / clip.Framerate);
 
         var right = new MediaClip
         {
@@ -784,14 +839,16 @@ public partial class TimelineViewModel : ObservableObject
             Name = clip.Name,
             TimelineStart = frame,
         };
-        right.Transform.CopyFrom(clip.Transform);
-        foreach (var filter in clip.Filters) right.Filters.Add(filter);
 
-        var transitionsBefore = track.Transitions.ToList();
+        right.Transform.CopyFrom(clip.Transform);
+        foreach (Filter filter in clip.Filters) 
+            right.Filters.Add(filter);
+
+        List<Transition> transitionsBefore = track.Transitions.ToList();
         clip.SourceOut = splitSourceTime;        // shrink the original into the left half (Duration recomputes)
         InsertSorted(track, right);
         track.ReassignTransitionsForSplit(clip, clip, right);
-        var transitionsAfter = track.Transitions.ToList();
+        List<Transition> transitionsAfter = track.Transitions.ToList();
 
         return new SplitClipCommand(this, track, clip, right, sourceOutBefore, splitSourceTime, transitionsBefore, transitionsAfter);
     }
@@ -800,7 +857,9 @@ public partial class TimelineViewModel : ObservableObject
     // TimelineSelectionScope so the whole selection survives the multi-step undo/redo.
     private void PushBundle(IReadOnlyList<IUndoableCommand> commands)
     {
-        if (commands.Count == 0) return;
+        if (commands.Count == 0) 
+            return;
+
         History.Push(commands.Count == 1
             ? commands[0]
             : new CompositeCommand(commands, new TimelineSelectionScope(this)));

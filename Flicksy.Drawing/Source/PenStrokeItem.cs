@@ -33,8 +33,8 @@ public sealed class PenStrokeItem : DrawingItem
                 return Rect.Empty;
             }
 
-            var b = Geometry.Bounds;
-            var inflate = Thickness / 2.0;
+            Rect b = Geometry.Bounds;
+            double inflate = Thickness / 2.0;
             b.Inflate(inflate, inflate);
             return b;
         }
@@ -53,14 +53,14 @@ public sealed class PenStrokeItem : DrawingItem
 
     public override bool HitTest(Point localPoint)
     {
-        var points = BasePoints;
+        PointCollection points = BasePoints;
         if (points.Count == 0)
         {
             return false;
         }
 
-        var tolerance = Math.Max(1d, Thickness * 0.5d);
-        var toleranceSquared = tolerance * tolerance;
+        double tolerance = Math.Max(1d, Thickness * 0.5d);
+        double toleranceSquared = tolerance * tolerance;
 
         if (points.Count == 1)
         {
@@ -99,22 +99,22 @@ public sealed class PenStrokeItem : DrawingItem
 
     private static double DistanceSquared(Point a, Point b)
     {
-        var dx = a.X - b.X;
-        var dy = a.Y - b.Y;
+        double dx = a.X - b.X;
+        double dy = a.Y - b.Y;
         return (dx * dx) + (dy * dy);
     }
 
     private static double DistanceSquaredToSegment(Point point, Point start, Point end)
     {
-        var vx = end.X - start.X;
-        var vy = end.Y - start.Y;
-        var lengthSquared = (vx * vx) + (vy * vy);
+        double vx = end.X - start.X;
+        double vy = end.Y - start.Y;
+        double lengthSquared = (vx * vx) + (vy * vy);
         if (lengthSquared <= double.Epsilon)
         {
             return DistanceSquared(point, start);
         }
 
-        var t = ((point.X - start.X) * vx + (point.Y - start.Y) * vy) / lengthSquared;
+        double t = ((point.X - start.X) * vx + (point.Y - start.Y) * vy) / lengthSquared;
         t = Math.Clamp(t, 0d, 1d);
 
         var closest = new Point(start.X + (t * vx), start.Y + (t * vy));
@@ -149,10 +149,10 @@ public sealed class PenStrokeItem : DrawingItem
 
             for (var i = 0; i < points.Count - 1; i++)
             {
-                var p0 = i == 0 ? points[i] : points[i - 1];
-                var p1 = points[i];
-                var p2 = points[i + 1];
-                var p3 = i + 2 < points.Count ? points[i + 2] : points[i + 1];
+                Point p0 = i == 0 ? points[i] : points[i - 1];
+                Point p1 = points[i];
+                Point p2 = points[i + 1];
+                Point p3 = i + 2 < points.Count ? points[i + 2] : points[i + 1];
 
                 var cp1 = new Point(
                     p1.X + ((p2.X - p0.X) * tension / 6d),

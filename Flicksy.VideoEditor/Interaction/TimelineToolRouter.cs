@@ -49,7 +49,7 @@ public sealed class TimelineToolRouter
 
     public bool OnPointerDown(Point point, TimelineHit hit, MouseButtonEventArgs e)
     {
-        var tool = SelectedModeTool ?? _hitZoneSelector(hit.Zone);
+        ITimelineTool? tool = SelectedModeTool ?? _hitZoneSelector(hit.Zone);
         _capturedTool = tool;
         return tool is not null && tool.OnPointerDown(point, hit, e);
     }
@@ -61,7 +61,7 @@ public sealed class TimelineToolRouter
 
     public void OnPointerUp(Point point, MouseButtonEventArgs e)
     {
-        var tool = _capturedTool;
+        ITimelineTool? tool = _capturedTool;
         _capturedTool = null;
         tool?.OnPointerUp(point, e);
     }
@@ -73,7 +73,7 @@ public sealed class TimelineToolRouter
     /// </summary>
     public void CancelGesture()
     {
-        var tool = _capturedTool;
+        ITimelineTool? tool = _capturedTool;
         _capturedTool = null;
         tool?.Cancel();
     }
@@ -85,7 +85,7 @@ public sealed class TimelineToolRouter
     /// </summary>
     public void OnPointerHover(Point point, TimelineHit hit, MouseEventArgs e)
     {
-        var tool = SelectedModeTool ?? _hitZoneSelector(hit.Zone);
+        ITimelineTool? tool = SelectedModeTool ?? _hitZoneSelector(hit.Zone);
         tool?.OnPointerHover(point, hit, e);
     }
 }

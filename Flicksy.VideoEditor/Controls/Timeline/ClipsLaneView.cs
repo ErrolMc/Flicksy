@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
@@ -181,8 +182,11 @@ public sealed class ClipsLaneView : Canvas
 
     private void OnClipPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is not Clip clip) return;
-        if (!_clipViews.TryGetValue(clip, out var view)) return;
+        if (sender is not Clip clip) 
+            return;
+
+        if (!_clipViews.TryGetValue(clip, out var view)) 
+            return;
 
         // Fully qualified: `Clip` alone resolves to UIElement.Clip (a Geometry property)
         // inside this Canvas-derived type, so nameof on it fails to compile.
@@ -202,7 +206,8 @@ public sealed class ClipsLaneView : Canvas
         _clipViews.Clear();
         Children.Clear();
 
-        if (Track is null) return;
+        if (Track is null) 
+            return;
 
         foreach (var clip in Track.Clips)
         {
@@ -223,7 +228,7 @@ public sealed class ClipsLaneView : Canvas
 
     private void UpdateClipLayout(ClipView view, Clip clip)
     {
-        var px = Timeline?.PixelsPerFrame ?? 1.0;
+        double px = Timeline?.PixelsPerFrame ?? 1.0;
         Canvas.SetLeft(view, clip.TimelineStart * px);
         Canvas.SetTop(view, ClipVerticalPadding);
         view.Width = Math.Max(MinClipWidth, clip.Duration * px);
@@ -232,7 +237,7 @@ public sealed class ClipsLaneView : Canvas
 
     private void UpdateAllLayouts()
     {
-        foreach (var (clip, view) in _clipViews)
+        foreach ((Clip clip, ClipView view) in _clipViews)
         {
             UpdateClipLayout(view, clip);
         }
@@ -243,8 +248,8 @@ public sealed class ClipsLaneView : Canvas
         // Clip is a plain reference type (no overridden Equals), so Contains is reference
         // identity — same semantics as the old ReferenceEquals(SelectedClip) check, extended
         // to the full multi-selection set.
-        var selection = Timeline?.SelectedClips;
-        foreach (var (clip, view) in _clipViews)
+        ObservableCollection<Clip>? selection = Timeline?.SelectedClips;
+        foreach ((Clip clip, ClipView view) in _clipViews)
         {
             view.IsSelected = selection is not null && selection.Contains(clip);
         }
@@ -259,14 +264,16 @@ public sealed class ClipsLaneView : Canvas
             child.Measure(constraint);
         }
 
-        var width = ComputeContentWidth();
+        double width = ComputeContentWidth();
         return new Size(width, TrackHeight);
     }
 
     private double ComputeContentWidth()
     {
-        if (Timeline is null) return 0;
-        var totalFrames = Math.Max(Timeline.Transport.TotalFrames, 1);
+        if (Timeline is null) 
+            return 0;
+
+        int totalFrames = Math.Max(Timeline.Transport.TotalFrames, 1);
         return totalFrames * Timeline.PixelsPerFrame;
     }
 
@@ -285,18 +292,21 @@ public sealed class ClipsLaneView : Canvas
     {
         try
         {
-            var source = TryGetMediaSource(e);
-            if (source is null || Track is null || Timeline is null) return;
+            MediaSource? source = TryGetMediaSource(e);
+            if (source is null || Track is null || Timeline is null) 
+                return;
+
             // A locked track is inert (ADR 0006): refuse every drop. Null streams falls through
             // to the early return below, same as a kind/stream-matrix or missing-source refusal.
-            var streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
-            if (streams is null) return;
+            ClipStreams? streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
+            if (streams is null) 
+                return;
 
-            var framerate = Timeline.Project.Settings.Framerate;
-            var draggedDuration = ComputeDraggedDuration(source, framerate);
-            var landingFrame = LandingFrameFromCursor(e);
-            var altHeld = (e.KeyStates & DragDropKeyStates.AltKey) == DragDropKeyStates.AltKey;
-            var snapped = Timeline.Snap(landingFrame, Track, draggedDuration, altHeld);
+            int framerate = Timeline.Project.Settings.Framerate;
+            int draggedDuration = ComputeDraggedDuration(source, framerate);
+            int landingFrame = LandingFrameFromCursor(e);
+            bool altHeld = (e.KeyStates & DragDropKeyStates.AltKey) == DragDropKeyStates.AltKey;
+            int snapped = Timeline.Snap(landingFrame, Track, draggedDuration, altHeld);
 
             var clip = new MediaClip
             {
@@ -325,7 +335,7 @@ public sealed class ClipsLaneView : Canvas
 
     private void UpdateDragOperation(DragEventArgs e)
     {
-        var source = TryGetMediaSource(e);
+        MediaSource? source = TryGetMediaSource(e);
         if (source is null || Track is null || Timeline is null)
         {
             e.Effects = DragDropEffects.None;
@@ -337,7 +347,7 @@ public sealed class ClipsLaneView : Canvas
 
         // A locked track is inert (ADR 0006): refuse every drop. Null streams routes into the
         // refused branch below (red tint, no ghost), same as a kind/stream-matrix refusal.
-        var streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
+        ClipStreams? streams = Track.Locked ? null : ResolveStreams(source, Track.Kind);
         if (streams is null)
         {
             e.Effects = DragDropEffects.None;
@@ -347,11 +357,11 @@ public sealed class ClipsLaneView : Canvas
             return;
         }
 
-        var framerate = Timeline.Project.Settings.Framerate;
-        var draggedDuration = ComputeDraggedDuration(source, framerate);
-        var landingFrame = LandingFrameFromCursor(e);
-        var altHeld = (e.KeyStates & DragDropKeyStates.AltKey) == DragDropKeyStates.AltKey;
-        var snapped = Timeline.Snap(landingFrame, Track, draggedDuration, altHeld);
+        int framerate = Timeline.Project.Settings.Framerate;
+        int draggedDuration = ComputeDraggedDuration(source, framerate);
+        int landingFrame = LandingFrameFromCursor(e);
+        bool altHeld = (e.KeyStates & DragDropKeyStates.AltKey) == DragDropKeyStates.AltKey;
+        int snapped = Timeline.Snap(landingFrame, Track, draggedDuration, altHeld);
 
         ClearRefusedTint();
         e.Effects = DragDropEffects.Copy;
@@ -361,8 +371,10 @@ public sealed class ClipsLaneView : Canvas
 
     private int LandingFrameFromCursor(DragEventArgs e)
     {
-        if (Timeline is null || Timeline.PixelsPerFrame <= 0) return 0;
-        var p = e.GetPosition(this);
+        if (Timeline is null || Timeline.PixelsPerFrame <= 0) 
+            return 0;
+        
+        Point p = e.GetPosition(this);
         return (int)Math.Round(p.X / Timeline.PixelsPerFrame);
     }
 
@@ -381,7 +393,9 @@ public sealed class ClipsLaneView : Canvas
     // Missing sources refuse on every track.
     private static ClipStreams? ResolveStreams(MediaSource source, TrackKind kind)
     {
-        if (source.IsMissing) return null;
+        if (source.IsMissing) 
+            return null;
+
         return (kind, source.HasVideo, source.HasAudio) switch
         {
             (TrackKind.Video, true, true) => ClipStreams.Both,
@@ -393,7 +407,9 @@ public sealed class ClipsLaneView : Canvas
 
     private static int ComputeDraggedDuration(MediaSource source, int framerate)
     {
-        if (framerate <= 0) return 0;
+        if (framerate <= 0) 
+            return 0;
+
         return (int)Math.Round(source.Duration.TotalSeconds * framerate);
     }
 
@@ -415,9 +431,12 @@ public sealed class ClipsLaneView : Canvas
 
     private void ShowGhost(int frame, int durationFrames, ClipStreams streams)
     {
-        if (Timeline is null) return;
-        var layer = AdornerLayer.GetAdornerLayer(this);
-        if (layer is null) return;
+        if (Timeline is null) 
+            return;
+
+        AdornerLayer? layer = AdornerLayer.GetAdornerLayer(this);
+        if (layer is null) 
+            return;
 
         if (_ghostAdorner is null)
         {
@@ -425,18 +444,20 @@ public sealed class ClipsLaneView : Canvas
             layer.Add(_ghostAdorner);
         }
 
-        var ppf = Timeline.PixelsPerFrame;
-        var x = frame * ppf;
-        var width = Math.Max(MinClipWidth, durationFrames * ppf);
-        var y = ClipVerticalPadding;
-        var height = Math.Max(0, TrackHeight - (ClipVerticalPadding * 2));
+        double ppf = Timeline.PixelsPerFrame;
+        double x = frame * ppf;
+        double width = Math.Max(MinClipWidth, durationFrames * ppf);
+        double y = ClipVerticalPadding;
+        double height = Math.Max(0, TrackHeight - (ClipVerticalPadding * 2));
         _ghostAdorner.UpdateRect(new Rect(x, y, width, height), streams);
     }
 
     private void HideGhost()
     {
-        if (_ghostAdorner is null) return;
-        var layer = AdornerLayer.GetAdornerLayer(this);
+        if (_ghostAdorner is null) 
+            return;
+
+        AdornerLayer layer = AdornerLayer.GetAdornerLayer(this);
         layer?.Remove(_ghostAdorner);
         _ghostAdorner = null;
     }
@@ -468,7 +489,9 @@ internal sealed class GhostClipAdorner : Adorner
 
     protected override void OnRender(DrawingContext dc)
     {
-        if (_rect.Width <= 0 || _rect.Height <= 0) return;
+        if (_rect.Width <= 0 || _rect.Height <= 0) 
+            return;
+
         dc.DrawRectangle(_fill, null, _rect);
     }
 
@@ -477,7 +500,7 @@ internal sealed class GhostClipAdorner : Adorner
     // split-stream case stays visually distinct from a Video-track drop.
     private static Brush BuildFill(ClipStreams streams)
     {
-        var color = streams switch
+        Color color = streams switch
         {
             ClipStreams.Audio => Color.FromArgb(0x66, 0x2C, 0x6A, 0x6A),
             _ => Color.FromArgb(0x66, 0x1F, 0x4F, 0x7A),

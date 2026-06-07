@@ -22,12 +22,12 @@ public class TimelineDetachAudioTests
     [Test]
     public void DetachAudio_AppendsAudioTrackWithAudioHalf_AndFlipsSourceToVideo()
     {
-        var (vm, project, clip) = Setup();
+        (TimelineViewModel vm, ProjectModel project, MediaClip clip) = Setup();
 
         vm.DetachAudio(clip);
 
         Assert.That(project.Tracks, Has.Count.EqualTo(2));
-        var audioTrack = project.Tracks[1];
+        Track audioTrack = project.Tracks[1];
         Assert.That(audioTrack.Kind, Is.EqualTo(TrackKind.Audio));
         Assert.That(audioTrack.Name, Is.EqualTo("Audio 2"));   // bare "Audio" default is never reused
         Assert.That(audioTrack.Clips, Has.Count.EqualTo(1));
@@ -46,7 +46,7 @@ public class TimelineDetachAudioTests
     [Test]
     public void DetachAudio_IsOneUndoStep_ThatUnwindsTrackClipAndStreamFlip()
     {
-        var (vm, project, clip) = Setup();
+        (TimelineViewModel vm, ProjectModel project, MediaClip clip) = Setup();
 
         vm.DetachAudio(clip);
         Assert.That(vm.History.CanUndo, Is.True);
@@ -62,7 +62,7 @@ public class TimelineDetachAudioTests
     [Test]
     public void DetachAudio_Redo_Reinstates()
     {
-        var (vm, project, clip) = Setup();
+        (TimelineViewModel vm, ProjectModel project, MediaClip clip) = Setup();
 
         vm.DetachAudio(clip);
         vm.History.UndoCommand.Execute(null);
@@ -76,7 +76,7 @@ public class TimelineDetachAudioTests
     [Test]
     public void DetachAudio_OnLockedTrack_IsNoOp()
     {
-        var (vm, project, clip) = Setup();
+        (TimelineViewModel vm, ProjectModel project, MediaClip clip) = Setup();
         project.Tracks[0].Locked = true;
 
         vm.DetachAudio(clip);
@@ -89,7 +89,7 @@ public class TimelineDetachAudioTests
     [Test]
     public void DetachAudio_OnAudioOnlyClip_IsNoOp()
     {
-        var (vm, project, clip) = Setup();
+        (TimelineViewModel vm, ProjectModel project, MediaClip clip) = Setup();
         clip.Streams = ClipStreams.Audio;   // only Both clips can be detached
 
         vm.DetachAudio(clip);

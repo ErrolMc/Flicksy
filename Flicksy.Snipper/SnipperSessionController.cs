@@ -4,7 +4,6 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Forms;
 using Flicksy.Snipper.Overlays;
 
 namespace Flicksy.Snipper;
@@ -37,8 +36,8 @@ internal sealed class SnipperSessionController : IDisposable
 
     private void ShowPreSnipOverlay()
     {
-        var cursor = Cursor.Position;
-        var bounds = Screen.FromPoint(cursor).Bounds;
+        System.Drawing.Point cursor = Cursor.Position;
+        Rectangle bounds = Screen.FromPoint(cursor).Bounds;
 
         var overlay = new PreSnipOverlayWindow(bounds, OnSnipCaptured, ShowVideoRecordingOverlay);
         _overlayWindow = overlay;
@@ -128,7 +127,7 @@ internal sealed class SnipperSessionController : IDisposable
 
     internal bool TryLaunchPostSnipWithMedia(string mediaPath, out string? errorMessage)
     {
-        var postSnipPath = ResolvePostSnipExecutablePath();
+        string? postSnipPath = ResolvePostSnipExecutablePath();
         if (string.IsNullOrWhiteSpace(postSnipPath))
         {
             errorMessage = "Flicksy.PostSnip.exe was not found. Build Flicksy.PostSnip first.";
@@ -162,8 +161,8 @@ internal sealed class SnipperSessionController : IDisposable
 
     private static string? ResolvePostSnipExecutablePath()
     {
-        var baseDirectory = AppContext.BaseDirectory;
-        var candidates = new[]
+        string baseDirectory = AppContext.BaseDirectory;
+        string[] candidates = new[]
         {
             Path.Combine(baseDirectory, "Flicksy.PostSnip.exe"),
             Path.GetFullPath(Path.Combine(baseDirectory, "..", "..", "..", "..", "Flicksy.PostSnip", "bin", "Debug", "net10.0-windows", "Flicksy.PostSnip.exe")),

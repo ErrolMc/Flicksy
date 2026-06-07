@@ -1,6 +1,7 @@
 using Flicksy.Drawing.Undo;
 using Flicksy.VideoEditor.Project;
 using Flicksy.VideoEditor.ViewModels;
+using System.Collections.ObjectModel;
 
 namespace Flicksy.VideoEditor.Undo.Commands;
 
@@ -35,8 +36,8 @@ public sealed class AddTrackCommand : IUndoableCommand
 
     public void Redo()
     {
-        var tracks = _viewModel.Project.Tracks;
-        var index = _index < 0 || _index > tracks.Count ? tracks.Count : _index;
+        ObservableCollection<Track> tracks = _viewModel.Project.Tracks;
+        int index = _index < 0 || _index > tracks.Count ? tracks.Count : _index;
         tracks.Insert(index, _track);
     }
 

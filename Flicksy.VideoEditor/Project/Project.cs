@@ -38,11 +38,12 @@ public partial class Project : ObservableObject
             throw new ArgumentException("Source path is required.", nameof(sourcePath));
         }
 
-        var project = CreateEmpty();
+        Project project = CreateEmpty();
         var source = MediaSource.Probe(sourcePath);
+        source = MediaSource.Probe(sourcePath);
         project.MediaSources.Add(source);
 
-        var videoTrack = project.Tracks[0];
+        Track videoTrack = project.Tracks[0];
         videoTrack.Clips.Add(new MediaClip
         {
             MediaSourceId = source.Id,
@@ -58,8 +59,8 @@ public partial class Project : ObservableObject
 
     public static Project CreateStub()
     {
-        var project = CreateEmpty();
-        var framerate = project.Settings.Framerate;
+        Project project = CreateEmpty();
+        int framerate = project.Settings.Framerate;
 
         // Fake-path sources with IsMissing=true so they don't probe — every stub
         // bin entry and clip will render red once 1b / step 2 land, intentionally
@@ -107,7 +108,7 @@ public partial class Project : ObservableObject
         project.MediaSources.Add(clipB);
         project.MediaSources.Add(soundtrack);
 
-        var videoTrack = project.Tracks[0];
+        Track videoTrack = project.Tracks[0];
         videoTrack.Clips.Add(new MediaClip
         {
             MediaSourceId = clipA.Id,
@@ -129,14 +130,14 @@ public partial class Project : ObservableObject
             TimelineStart = 90,
         });
 
-        var overlayTrack = project.Tracks[2];
+        Track overlayTrack = project.Tracks[2];
         overlayTrack.Clips.Add(new GraphicsClip
         {
             DurationFrames = 60,
             TimelineStart = 30,
         });
 
-        var audioTrack = project.Tracks[3];
+        Track audioTrack = project.Tracks[3];
         audioTrack.Clips.Add(new MediaClip
         {
             MediaSourceId = soundtrack.Id,

@@ -43,8 +43,10 @@ public sealed class DecodingFrameProvider : IClipFrameProvider, IDisposable
 
     public VideoFrame? Acquire(MediaClip clip, TimeSpan sourceTime, double decodeScale)
     {
-        var decoder = _decoders.GetOrCreate(clip, _sampleRate, decodeScale);
-        if (decoder is null || !decoder.HasVideo) return null;
+        IMediaDecoder? decoder = _decoders.GetOrCreate(clip, _sampleRate, decodeScale);
+        if (decoder is null || !decoder.HasVideo) 
+            return null;
+
         return decoder.GetVideoFrameAt(sourceTime);
     }
 
@@ -59,6 +61,7 @@ public sealed class DecodingFrameProvider : IClipFrameProvider, IDisposable
 
     public void Dispose()
     {
-        if (_ownsCache) _decoders.Dispose();
+        if (_ownsCache) 
+            _decoders.Dispose();
     }
 }

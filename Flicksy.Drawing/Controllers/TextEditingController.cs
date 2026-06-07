@@ -124,20 +124,20 @@ internal sealed class TextEditingController
 
     private void PositionEditTextBox(TextItem item)
     {
-        var matrix = item.Transform.Matrix;
+        Matrix matrix = item.Transform.Matrix;
 
         // Align the textbox's first-line baseline with the geometry's baseline.
         // Geometry baseline in canonical Y = item.Origin.Y + FormattedText.Baseline.
         // TextBox first-line baseline in textbox-local Y = MeasureFirstLineBaseline(...).
         // Canvas position is in DrawingView coords; the item's linear (rotation/scale) part
         // is applied as RenderTransform around the textbox's top-left.
-        var formattedBaseline = GetFormattedTextBaseline(item.FontFamily, item.FontSize);
-        var textBoxBaseline = MeasureFirstLineBaseline(item.FontFamily, item.FontSize);
-        var baselineDelta = formattedBaseline - textBoxBaseline;
+        double formattedBaseline = GetFormattedTextBaseline(item.FontFamily, item.FontSize);
+        double textBoxBaseline = MeasureFirstLineBaseline(item.FontFamily, item.FontSize);
+        double baselineDelta = formattedBaseline - textBoxBaseline;
 
-        var worldOrigin = matrix.Transform(item.Origin);
-        var offsetX = matrix.M21 * baselineDelta;
-        var offsetY = matrix.M22 * baselineDelta;
+        Point worldOrigin = matrix.Transform(item.Origin);
+        double offsetX = matrix.M21 * baselineDelta;
+        double offsetY = matrix.M22 * baselineDelta;
 
         Canvas.SetLeft(_editTextBox, worldOrigin.X + offsetX);
         Canvas.SetTop(_editTextBox, worldOrigin.Y + offsetY);
@@ -259,7 +259,7 @@ internal sealed class TextEditingController
             }
 
             // Walk up the logical tree first (handles popup content), then fall back to visual tree.
-            var next = LogicalTreeHelper.GetParent(current);
+            DependencyObject next = LogicalTreeHelper.GetParent(current);
             if (next is null && current is Visual visual)
             {
                 next = VisualTreeHelper.GetParent(visual);

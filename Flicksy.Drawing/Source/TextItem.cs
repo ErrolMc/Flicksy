@@ -150,8 +150,8 @@ public sealed class TextItem : DrawingItem
                 return Rect.Empty;
             }
 
-            var b = _glyphBounds;
-            var inflate = Outline is not null ? OutlineThickness / 2.0 : 0d;
+            Rect b = _glyphBounds;
+            double inflate = Outline is not null ? OutlineThickness / 2.0 : 0d;
             if (inflate > 0)
             {
                 b.Inflate(inflate, inflate);
@@ -233,7 +233,7 @@ public sealed class TextItem : DrawingItem
             Brushes.Black,
             1.0);
 
-        var geometry = formatted.BuildGeometry(_origin);
+        Geometry geometry = formatted.BuildGeometry(_origin);
         if (geometry.CanFreeze)
         {
             geometry.Freeze();
@@ -248,8 +248,8 @@ public sealed class TextItem : DrawingItem
     private Rect EmptyCaretBounds()
     {
         // Caret-sized box at the origin so the selection overlay and hit-testing remain usable when empty.
-        var width = Math.Max(_fontSize * 0.5, 6d);
-        var height = Math.Max(_fontSize, 6d);
+        double width = Math.Max(_fontSize * 0.5, 6d);
+        double height = Math.Max(_fontSize, 6d);
         return new Rect(_origin.X, _origin.Y, width, height);
     }
 }
