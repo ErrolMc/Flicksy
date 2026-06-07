@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flicksy.VideoEditor.Composition;
+using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
 
 namespace Flicksy.VideoEditor.ViewModels;
@@ -24,10 +25,12 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// via the inspector), so the call into <c>SkiaCompositor</c> stays on the UI thread —
 /// required both for the <c>GraphicsClip</c> render path that bounces through
 /// <c>RenderTargetBitmap</c> and for the unfrozen reusable bitmap, which can't cross threads.
-/// Off-thread decode-ahead is deferred phase 2 (ADR 0005).
+/// During playback the per-frame video <em>decode</em> is supplied by an off-thread pump (the
+/// engine sets <see cref="PlaybackFrames"/>); the compositing call itself still runs here on the UI
+/// thread, so those two constraints hold (ADR 0009).
 /// </para>
 /// </summary>
-public partial class PreviewViewModel : ObservableObject
+public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
 {
     private readonly Project.Project _project;
     private readonly TransportViewModel _transport;
@@ -51,6 +54,55 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private PreviewQuality selectedQuality = PreviewQuality.Full;
+
+    private IPlaybackFrameSource? _playbackFrames;
+
+    /// <summary>
+    /// Off-thread decode source during playback (ADR 0009), set by <see cref="Playback.PlaybackEngine"/>
+    /// on play and cleared on pause. When non-null, <see cref="Render"/> composites from pre-decoded
+    /// frames instead of decoding synchronously on the UI thread; when null it uses the synchronous
+    /// path (scrub / static preview). Not an <c>[ObservableProperty]</c> — nothing in the UI binds to it.
+    /// <para>
+    /// Clearing it to null re-renders immediately via the synchronous scrub path so the displayed frame is
+    /// correct the instant playback stops — in particular a seek-while-playing (the engine pauses, which
+    /// clears this) repaints the seeked frame at once instead of leaving the stale, still-positioned pump's
+    /// missed frame on screen until the next Play. Setting it to the pump deliberately does NOT render here:
+    /// Play's prime-hold + clock drive the first frame (and the paused scrub already left it on screen), and
+    /// a render now would consume the buffered start frame (BeginFrame/EndFrame), emptying the slot that
+    /// Play's <c>HasReadyFrameAt</c> gate waits on and stalling the start by the full prime timeout.
+    /// </para>
+    /// </summary>
+    public IPlaybackFrameSource? PlaybackFrames
+    {
+        get => _playbackFrames;
+        set
+        {
+            _playbackFrames = value;
+            // Repaint only on a clear (pause / seek-induced pause / dispose) — see remarks for why
+            // setting it to the pump must not render here.
+            if (value is null)
+            {
+                Render();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The decode scale the preview currently renders at — matches the <c>decodeScale</c> passed to
+    /// the pump in <see cref="Render"/> (target pixel width ÷ project resolution width, i.e. the
+    /// selected quality). The engine reads it to warm the paused prefetch at the right scale.
+    /// </summary>
+    public double CurrentDecodeScale
+    {
+        get
+        {
+            var target = _target;
+            int width = ProjectSettings.ResolutionWidth;
+            return target is not null && width > 0
+                ? (double)target.PixelWidth / width
+                : 1.0;
+        }
+    }
 
     public PreviewViewModel(Project.Project project, TransportViewModel transport, ICompositor compositor)
     {
@@ -107,7 +159,32 @@ public partial class PreviewViewModel : ObservableObject
         {
             var target = EnsureTarget();
             if (target is null) return;
-            _compositor.RenderFrame(_project, _transport.Playhead, target);
+
+            int frame = _transport.Playhead;
+            var frames = PlaybackFrames;
+            if (frames is not null)
+            {
+                // Playback: composite from the off-thread pump's pre-decoded frames (ADR 0009).
+                // The decode scale matches what the compositor derives internally (target/project).
+                double decodeScale = (double)target.PixelWidth / ProjectSettings.ResolutionWidth;
+                if (!frames.BeginFrame(frame, decodeScale))
+                {
+                    return; // miss → keep the previous frame
+                }
+                try
+                {
+                    _compositor.RenderFrame(_project, frame, target, frames, frames.CurrentLayers);
+                }
+                finally
+                {
+                    frames.EndFrame();
+                }
+            }
+            else
+            {
+                // Scrub / static preview: synchronous decode on the UI thread (the canonical path).
+                _compositor.RenderFrame(_project, frame, target);
+            }
         }
         catch (Exception ex)
         {

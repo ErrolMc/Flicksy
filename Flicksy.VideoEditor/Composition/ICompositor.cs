@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows.Media.Imaging;
 
 namespace Flicksy.VideoEditor.Composition;
@@ -17,10 +18,12 @@ namespace Flicksy.VideoEditor.Composition;
 ///         <see cref="WriteableBitmap"/> the caller supplies and reuses across frames, so
 ///         the compositor allocates no per-frame frame buffer. The bitmap is left
 ///         unfrozen, so the compositor and whoever presents it must share one thread (the
-///         UI thread today). Cross-thread / decode-ahead playback is #11's deferred phase 2.</item>
-///   <item>Decoder ownership is internal — the compositor maintains its own
-///         <c>Clip.Id</c>-keyed cache of <c>IMediaDecoder</c>s. Callers see only the
-///         pixels written into their bitmap.</item>
+///         UI thread today). Compositing always runs on that shared thread; during playback the
+///         per-frame <em>decode</em> is supplied off-thread via the optional frame provider (ADR 0009).</item>
+///   <item>Decode source is pluggable — by default the compositor decodes synchronously through
+///         its own <c>Clip.Id</c>-keyed cache; a caller may instead pass an
+///         <see cref="IClipFrameProvider"/> (the playback pump). Callers see only the pixels
+///         written into their bitmap.</item>
 /// </list>
 /// </summary>
 public interface ICompositor : IDisposable
@@ -37,6 +40,20 @@ public interface ICompositor : IDisposable
     /// <c>Image</c> repaints in place, so the caller need not reassign its <c>Image.Source</c>
     /// between frames. Throws <see cref="System.ArgumentException"/> only when
     /// <paramref name="target"/> has a non-positive dimension.
+    /// <para>
+    /// <paramref name="frames"/> is the source of each video layer's decoded frame. When
+    /// <c>null</c> (export / scrub / static preview) the compositor decodes synchronously on the
+    /// calling thread via its own cache — the canonical path. During playback the off-thread
+    /// decode-ahead worker passes itself here so the codec never runs on the UI thread (ADR 0009);
+    /// it also passes <paramref name="plannedLayers"/> — the layer list it already planned — so the
+    /// compositor renders that immutable snapshot instead of re-walking the live (possibly mutating)
+    /// project. When both are <c>null</c> the compositor plans the frame itself.
+    /// </para>
     /// </summary>
-    void RenderFrame(Project.Project project, int frame, WriteableBitmap target);
+    void RenderFrame(
+        Project.Project project,
+        int frame,
+        WriteableBitmap target,
+        IClipFrameProvider? frames = null,
+        IReadOnlyList<CompositionLayer>? plannedLayers = null);
 }

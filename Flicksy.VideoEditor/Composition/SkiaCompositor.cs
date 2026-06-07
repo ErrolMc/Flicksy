@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -15,9 +14,11 @@ namespace Flicksy.VideoEditor.Composition;
 /// <see cref="ICompositor"/> backed by SkiaSharp's CPU surface. Wraps each call's target
 /// <see cref="WriteableBitmap"/>'s back buffer via <see cref="SKBitmap.InstallPixels(SKImageInfo, IntPtr, int)"/>
 /// so paints land directly in WPF-bindable memory — no intermediate Skia surface, no
-/// extra copy. <see cref="CompositionPlanner.PlanFrame"/> supplies the layer list; this
-/// class only owns paint dispatch and the (video) decoder cache. Audio mixing moved to
-/// <see cref="AudioMixer"/> per ADR 0005.
+/// extra copy. <see cref="CompositionPlanner.PlanFrame"/> supplies the layer list (or the caller
+/// passes a pre-planned snapshot); this class owns paint dispatch and pulls each video layer's
+/// frame through an <see cref="IClipFrameProvider"/> — a synchronous, self-owned
+/// <see cref="DecodingFrameProvider"/> by default. Audio mixing moved to <see cref="AudioMixer"/>
+/// per ADR 0005.
 /// <para>
 /// Render scale: the target bitmap's size is the physical surface; the project resolution is
 /// the logical space layers position in. A target smaller than the project (proxy /
@@ -34,15 +35,25 @@ namespace Flicksy.VideoEditor.Composition;
 /// must share a thread — the UI thread today. Two independent constraints already point
 /// the same way: the <see cref="GraphicsClip"/> path needs a Dispatcher for
 /// <see cref="RenderTargetBitmap"/>, and an unfrozen bitmap can't cross threads.
-/// Off-UI decode-ahead playback is #11's deferred phase 2.
+/// During playback the per-frame <em>decode</em> runs ahead on a background thread and is supplied
+/// via the optional <see cref="IClipFrameProvider"/> argument; compositing itself stays on the
+/// shared (UI) thread, so both constraints above still hold (ADR 0009).
 /// </para>
 /// </summary>
 public sealed class SkiaCompositor : ICompositor
 {
-    private readonly MediaDecoderCache _decoders = new();
+    // The synchronous decode path (export / scrub / static preview). Lazily created on first use
+    // because the compositor doesn't know the project (hence the sample rate) until RenderFrame.
+    // Skipped entirely when a caller supplies its own frame provider (the playback pump).
+    private DecodingFrameProvider? _defaultFrames;
     private bool _disposed;
 
-    public void RenderFrame(Project.Project project, int frame, WriteableBitmap target)
+    public void RenderFrame(
+        Project.Project project,
+        int frame,
+        WriteableBitmap target,
+        IClipFrameProvider? frames = null,
+        IReadOnlyList<CompositionLayer>? plannedLayers = null)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(target);
@@ -68,6 +79,10 @@ public sealed class SkiaCompositor : ICompositor
                 nameof(target));
         }
 
+        // Decode source: the caller's prefetch provider during playback, else the lazily-created
+        // synchronous one (decodes on this thread — the canonical export/scrub/static path).
+        var activeFrames = frames ?? (_defaultFrames ??= new DecodingFrameProvider(sampleRate));
+
         target.Lock();
         try
         {
@@ -90,12 +105,14 @@ public sealed class SkiaCompositor : ICompositor
             // smaller frames (ADR 0008), so convert/copy/raster shrink too, not just present.
             double decodeScale = (double)targetWidth / width;
 
-            var layers = CompositionPlanner.PlanFrame(project, frame);
+            // Use the snapshot the prefetch worker already planned (so we never re-walk a project
+            // the UI thread may be mutating mid-playback); plan ourselves on the synchronous path.
+            var layers = plannedLayers ?? CompositionPlanner.PlanFrame(project, frame);
             foreach (var layer in layers)
             {
                 // Audio-only layers don't contribute to the visual frame.
                 if (layer.Track.Kind == TrackKind.Audio) continue;
-                PaintLayer(canvas, layer, width, height, sampleRate, decodeScale);
+                PaintLayer(canvas, activeFrames, layer, width, height, decodeScale);
             }
         }
         finally
@@ -113,17 +130,17 @@ public sealed class SkiaCompositor : ICompositor
     {
         if (_disposed) return;
         _disposed = true;
-        _decoders.Dispose();
+        _defaultFrames?.Dispose();
     }
 
     // ---- Paint dispatch -----------------------------------------------------
 
-    private void PaintLayer(SKCanvas canvas, CompositionLayer layer, int projectWidth, int projectHeight, int sampleRate, double decodeScale)
+    private void PaintLayer(SKCanvas canvas, IClipFrameProvider frames, CompositionLayer layer, int projectWidth, int projectHeight, double decodeScale)
     {
         switch (layer.Clip)
         {
             case MediaClip mediaClip when mediaClip.Streams != ClipStreams.Audio:
-                PaintMediaClip(canvas, layer, mediaClip, projectWidth, projectHeight, sampleRate, decodeScale);
+                PaintMediaClip(canvas, frames, layer, mediaClip, projectWidth, projectHeight, decodeScale);
                 break;
             case GraphicsClip graphicsClip:
                 PaintGraphicsClip(canvas, graphicsClip, projectWidth, projectHeight);
@@ -132,14 +149,11 @@ public sealed class SkiaCompositor : ICompositor
         }
     }
 
-    private void PaintMediaClip(SKCanvas canvas, CompositionLayer layer, MediaClip clip, int projectWidth, int projectHeight, int sampleRate, double decodeScale)
+    private void PaintMediaClip(SKCanvas canvas, IClipFrameProvider frames, CompositionLayer layer, MediaClip clip, int projectWidth, int projectHeight, double decodeScale)
     {
         if (clip.IsBroken) return;
 
-        var decoder = _decoders.GetOrCreate(clip, sampleRate, decodeScale);
-        if (decoder is null || !decoder.HasVideo) return;
-
-        var maybeFrame = decoder.GetVideoFrameAt(layer.SourceTime);
+        var maybeFrame = frames.Acquire(clip, layer.SourceTime, decodeScale);
         if (maybeFrame is null) return;
 
         var videoFrame = maybeFrame.Value;
@@ -192,8 +206,9 @@ public sealed class SkiaCompositor : ICompositor
         }
         finally
         {
-            // VideoFrame.Buffer is rented from ArrayPool — return it.
-            ArrayPool<byte>.Shared.Return(videoFrame.Buffer);
+            // Hand the frame back to the provider (ArrayPool return on the sync path; recycle
+            // into the bundle on the prefetch path).
+            frames.Release(videoFrame);
         }
     }
 

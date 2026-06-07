@@ -63,7 +63,9 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
         // Transport (which Preview, Timeline and the ruler already observe). Attach after both
         // exist — the engine needs Transport, and Transport's commands delegate to the engine.
-        _playbackEngine = new PlaybackEngine(project, Transport);
+        // Preview is passed as the IPlaybackFrameSink so the engine can point it at the off-thread
+        // decode-ahead pump during playback (ADR 0009).
+        _playbackEngine = new PlaybackEngine(project, Transport, Preview);
         Transport.AttachPlaybackController(_playbackEngine);
 
         // Timeline.SelectedClip is the user-facing write side (clip clicks); root's

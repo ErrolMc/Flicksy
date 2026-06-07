@@ -121,6 +121,10 @@ _Avoid_: "proxy" / "proxy mode" for this (reserve "proxy media" for the separate
 Per-source primitive that produces raw video frames or audio samples from a single source file at a given `SourceTime`. Pull-shaped (synchronous `GetVideoFrameAt(t)` / `GetAudioSamplesAt(t, n)`), no playback clock. Distinct from `IVideoPlayer`, which is push-shaped and owns its own clock for the snip editor's video playback. Lives in `Flicksy.Drawing/Media/` so it's available to both surfaces; the eventual unification of PostSnip's playback onto `IMediaDecoder` is tracked in issue #23.
 _Avoid_: bare "decoder" without "media" prefix, "player" (that's `IVideoPlayer`'s shape).
 
+**Decode-ahead pump (prefetch pump)**:
+The background worker that decodes upcoming video frames ahead of the playhead during playback so the UI thread only composites already-decoded frames (`VideoPrefetchPump`). A producer thread fills a bounded, generation-stamped queue of **frame bundles** — each one output frame's decoded video layers plus its `CompositionLayer` snapshot; `PreviewViewModel` consumes them on the UI thread and `PlaybackEngine` owns the pump's lifecycle. Moves only the **decode** off the UI thread; compositing stays on it. The producer decodes strictly forward; if it trails the playhead by more than a resync threshold (~1 s) it jumps forward to the playhead in one seek (**bounded resync**) so video drops frames with bounded lag rather than drifting behind the audio. On a true miss (nothing decoded up to the playhead yet) the consumer holds the previous frame. See [ADR 0009](adr/0009-decode-ahead-pump.md).
+_Avoid_: "render-ahead" (only decode is off-thread, not compositing), "proxy" (that's **preview quality** / proxy media), "buffer" or "frame queue" for the **frame bundle** (a bundle is all of one frame's layers together, not a single image).
+
 ### Shared primitives (snip + video editor)
 
 **DrawingItem**:
