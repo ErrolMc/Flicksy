@@ -10,7 +10,7 @@ A Windows desktop tool for capturing the screen, annotating it, and editing vide
 Flicksy has two surfaces, each running as its own process:
 
 - **Snip editor** — a fast capture-and-annotate flow. Press a hotkey, drag out a region, and either grab a still image or record it to video. The captured media opens in an editor where you draw on top (pen, shapes, text), crop, and save out. One image or video in, annotations on top, file out.
-- **Video editor** — a non-linear editor (NLE) for assembling clips on a multi-track timeline. Import media, drag clips onto tracks, and scrub a live composited preview.
+- **Video editor** — a non-linear editor (NLE) for assembling clips on a multi-track timeline. Import media, drag clips onto tracks, trim and arrange them, and play back or scrub a live composited preview with audio.
 
 The two surfaces share rendering primitives (drawing items, tools, undo, FFmpeg playback) through the `Flicksy.Drawing` class library, but otherwise run independently — each has its own document, its own undo stack, and its own FFmpeg init. They communicate only by passing file paths and CLI arguments to one another.
 
@@ -39,9 +39,9 @@ The normal entry point is a background tray app:
 | Surface | State |
 | --- | --- |
 | Snip editor (`Flicksy.PostSnip`) | Working — capture image or video, annotate (pen / shapes / text / erase), crop, pan / zoom / scrub, undo / redo, save PNG or copy MP4. |
-| Video editor (`Flicksy.VideoEditor`) | In active development — create a project, import media into the bin, drag clips onto timeline tracks, scrub a live composited preview, rename / split-audio clips, mute / lock / disable tracks. |
+| Video editor (`Flicksy.VideoEditor`) | In active development — create a project, import media into the bin, drag clips onto timeline tracks, edit the timeline (move / trim / split / delete, with multi-select), real-time playback with audio, scrub a live composited preview, rename and detach-audio on clips, mute / lock / disable tracks. |
 
-The video editor is being built out in numbered slices tracked on the [GitHub issue tracker](https://github.com/ErrolMc/Flicksy/issues). Not yet implemented: real-time playback, full timeline editing (trim / move / delete), drawing on clips, transitions, the per-clip inspectors, export to MP4, and project save/load. See [docs/video-editor/PLAN.md](docs/video-editor/PLAN.md) for the roadmap.
+The video editor is being built out in numbered slices tracked on the [GitHub issue tracker](https://github.com/ErrolMc/Flicksy/issues). Not yet implemented: drawing on clips, transitions, the per-clip inspectors, export to MP4, and project save/load. See [docs/video-editor/PLAN.md](docs/video-editor/PLAN.md) for the roadmap.
 
 ## Projects
 
@@ -55,7 +55,7 @@ The solution ([Flicksy.slnx](Flicksy.slnx)) has seven projects. The four `WinExe
 | [Flicksy.VideoEditor](Flicksy.VideoEditor) | WinExe | The multi-clip video editor (timeline, media bin, compositor preview). |
 | [Flicksy.Drawing](Flicksy.Drawing) | Library | Shared primitives: drawing items, tools, undo manager, FFmpeg playback, the drawing canvas. Used by both editors. |
 | [Flicksy.Icons](Flicksy.Icons) | Library | Icon PNG assets and a strongly-typed accessor. |
-| [Flicksy.VideoEditor.Tests](Flicksy.VideoEditor.Tests) | NUnit 4 | Unit tests for video-editor logic (currently the composition planner math). |
+| [Flicksy.VideoEditor.Tests](Flicksy.VideoEditor.Tests) | NUnit 4 | Unit tests for video-editor logic — composition planner, timeline hit-testing, the playback prefetch pump, and timeline edits (add / move / trim / split / delete / detach-audio). |
 
 For the full structural map — every namespace folder, drawing tool, undo command, view model, and the file behind each — read **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
@@ -107,7 +107,7 @@ dotnet run --project Flicksy.PostSnip -- "C:\path\to\media.png"
 dotnet test
 ```
 
-Test scope is intentionally narrow — pure logic that benefits from regression coverage (currently the compositor's timeline math). Backend-touching code (WPF, Skia, FFmpeg) is left to manual verification.
+Test scope is intentionally narrow — pure logic that benefits from regression coverage: the composition planner, timeline hit-testing and edit math (move / trim / split / delete / detach-audio), and the playback prefetch pump (against a fake decode source). Backend-touching code (WPF, Skia, FFmpeg) is left to manual verification.
 
 ## Tech stack
 
@@ -118,6 +118,7 @@ Test scope is intentionally narrow — pure logic that benefits from regression 
 | MVVM | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) |
 | Video decode / playback | [FFMediaToolkit](https://github.com/radek-k/FFMediaToolkit) over FFmpeg |
 | Video compositor | [SkiaSharp](https://github.com/mono/SkiaSharp) (CPU backend) |
+| Audio output | [NAudio](https://github.com/naudio/NAudio) (WASAPI shared mode) |
 | DI / hosting | `Microsoft.Extensions.Hosting` + `DependencyInjection` |
 | Tests | NUnit 4 |
 
