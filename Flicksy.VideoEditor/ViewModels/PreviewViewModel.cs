@@ -30,11 +30,17 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// thread, so those two constraints hold (ADR 0009).
 /// </para>
 /// </summary>
-public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
+public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, IDisposable
 {
     private readonly Project.Project _project;
     private readonly TransportViewModel _transport;
     private readonly ICompositor _compositor;
+
+    // Off-thread, coalesced scrubbing: a paused ruler/timeline seek decodes on a background thread
+    // (~120 ms random-access seek) instead of blocking the UI; the worker calls PresentScrubFrame
+    // back on the UI thread to composite (~0.5 ms). See ScrubController.
+    private readonly ScrubController _scrub;
+    private bool _disposed;
 
     // The reusable composite target. Recreated only when the project resolution changes;
     // every other frame paints into this same instance. CurrentFrame points at it.
@@ -60,10 +66,11 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
     /// <summary>
     /// Off-thread decode source during playback (ADR 0009), set by <see cref="Playback.PlaybackEngine"/>
     /// on play and cleared on pause. When non-null, <see cref="Render"/> composites from pre-decoded
-    /// frames instead of decoding synchronously on the UI thread; when null it uses the synchronous
-    /// path (scrub / static preview). Not an <c>[ObservableProperty]</c> — nothing in the UI binds to it.
+    /// frames instead of decoding synchronously on the UI thread; when null, a paused playhead change
+    /// scrubs off-thread via <see cref="ScrubController"/> and other repaints use the synchronous path
+    /// (static preview). Not an <c>[ObservableProperty]</c> — nothing in the UI binds to it.
     /// <para>
-    /// Clearing it to null re-renders immediately via the synchronous scrub path so the displayed frame is
+    /// Clearing it to null re-renders immediately via the synchronous static path so the displayed frame is
     /// correct the instant playback stops — in particular a seek-while-playing (the engine pauses, which
     /// clears this) repaints the seeked frame at once instead of leaving the stale, still-positioned pump's
     /// missed frame on screen until the next Play. Setting it to the pump deliberately does NOT render here:
@@ -114,6 +121,8 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
         _transport.PropertyChanged += OnTransportPropertyChanged;
         _project.Settings.PropertyChanged += OnSettingsPropertyChanged;
 
+        _scrub = new ScrubController(project, () => _transport.TotalFrames, PresentScrubFrame);
+
         // Render once so CurrentFrame is non-null at construction — the view's
         // Stretch=Uniform needs a sized source to letterbox correctly even on an empty
         // project (SkiaCompositor clears to black, so the first frame is a black fill at
@@ -136,7 +145,9 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
     {
         if (e.PropertyName == nameof(TransportViewModel.Playhead))
         {
-            Render();
+            // A playhead change is either a playback tick (handled by the pump path) or a user
+            // seek/scrub while paused (routed to the off-thread scrub worker).
+            Render(playheadChange: true);
         }
     }
 
@@ -153,12 +164,12 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
     // target bitmap (EnsureTarget) and repaints at the new scale.
     partial void OnSelectedQualityChanged(PreviewQuality value) => Render();
 
-    private void Render()
+    private void Render(bool playheadChange = false)
     {
         try
         {
             WriteableBitmap? target = EnsureTarget();
-            if (target is null) 
+            if (target is null)
                 return;
 
             int frame = _transport.Playhead;
@@ -169,9 +180,8 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
                 // The decode scale matches what the compositor derives internally (target/project).
                 double decodeScale = (double)target.PixelWidth / ProjectSettings.ResolutionWidth;
                 if (!frames.BeginFrame(frame, decodeScale))
-                {
                     return; // miss → keep the previous frame
-                }
+
                 try
                 {
                     _compositor.RenderFrame(_project, frame, target, frames, frames.CurrentLayers);
@@ -181,9 +191,20 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
                     frames.EndFrame();
                 }
             }
+            else if (playheadChange)
+            {
+                // Active scrub while paused: hand the target to the background ScrubController, which
+                // decodes off the UI thread and calls PresentScrubFrame back here. The UI thread does
+                // no decode, so it never freezes mid-drag (the PostSnip behaviour).
+                double scrubScale = (double)target.PixelWidth / ProjectSettings.ResolutionWidth;
+                _scrub.Request(frame, scrubScale);
+            }
             else
             {
-                // Scrub / static preview: synchronous decode on the UI thread (the canonical path).
+                // Initial / static / resolution / quality / settle-after-pause: a single, infrequent
+                // synchronous decode on the UI thread (the canonical path). Not a drag, so the
+                // on-thread decode is acceptable, and it keeps CurrentFrame painted synchronously at
+                // construction.
                 _compositor.RenderFrame(_project, frame, target);
             }
         }
@@ -194,6 +215,52 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink
             // playback loop, which needs a proper status channel anyway.
             System.Diagnostics.Debug.WriteLine($"PreviewViewModel.Render failed: {ex}");
         }
+    }
+
+    /// <summary>
+    /// Composite a worker-decoded scrub <paramref name="bundle"/> into the reusable target and
+    /// present it — the same cheap (~0.5 ms) paint the playback path does, just sourced from the
+    /// off-thread scrub decode instead of the pump. The <see cref="ScrubController"/> invokes this on
+    /// the UI thread and recycles the bundle afterwards.
+    /// </summary>
+    private void PresentScrubFrame(FrameBundle bundle)
+    {
+        // Playback may have taken over (or the VM disposed) between decode and this dispatch — drop
+        // the stale scrub frame rather than paint over the live one. (Controller still recycles it.)
+        if (_disposed || PlaybackFrames is not null)
+            return;
+
+        try
+        {
+            WriteableBitmap? target = EnsureTarget();
+            if (target is null)
+                return;
+
+            // No size guard needed (unlike a raw copy): PaintMediaClip maps the decoded frame onto
+            // the native source extent, so a bundle decoded at a now-stale scale still composites
+            // correctly, just at that fidelity for one frame.
+            var provider = new BundleFrameProvider(bundle);
+            _compositor.RenderFrame(_project, bundle.Frame, target, provider, bundle.Layers);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"PreviewViewModel.PresentScrubFrame failed: {ex}");
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        _transport.PropertyChanged -= OnTransportPropertyChanged;
+        _project.Settings.PropertyChanged -= OnSettingsPropertyChanged;
+
+        // Joins the scrub worker before tearing down its decoder cache. _disposed is set first, so a
+        // present callback already queued on the dispatcher no-ops instead of touching the compositor.
+        _scrub.Dispose();
     }
 
     /// <summary>

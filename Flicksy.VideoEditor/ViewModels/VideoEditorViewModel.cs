@@ -147,6 +147,9 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         // Engine first: stops the clock + audio output and unhooks Rendering before the
         // compositor's decoder cache (which the preview's last render may still touch) goes.
         _playbackEngine.Dispose();
+        // Preview next: joins its background scrub worker before the shared compositor (which the
+        // worker's present path uses) is torn down.
+        Preview.Dispose();
         _compositor.Dispose();
     }
 }

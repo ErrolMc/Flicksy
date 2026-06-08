@@ -22,11 +22,11 @@ namespace Flicksy.VideoEditor.Playback;
 /// <b>Threading.</b> One <c>lock (_gate)</c> guards <c>{_queue, _generation, _nextFrame, _scale,
 /// _running}</c> and is never held across a decode (decode runs in <see cref="ProducerLoop"/>
 /// outside the lock). <c>_current</c> is touched only on the UI thread
-/// (<see cref="BeginFrame"/>/<see cref="EndFrame"/>/<see cref="Acquire"/>/<see cref="SeekTo"/>,
+/// (<see cref="BeginFrame"/>/<see cref="EndFrame"/>/<see cref="Acquire"/>/<see cref="Reprime"/>,
 /// strictly paired, single-frame-in-flight) so it needs no lock. Buffer ownership is a strict
 /// baton: rented by the producer → owned by the queue at enqueue → owned by the consumer between a
 /// true <see cref="BeginFrame"/> and <see cref="EndFrame"/> → returned. A <b>generation</b> stamp
-/// makes seek authoritative: <see cref="SeekTo"/> bumps it and drains under the lock; the producer
+/// makes seek authoritative: <see cref="Reprime"/> bumps it and drains under the lock; the producer
 /// only enqueues if the generation still matches, so no stale-epoch (e.g. pre-seek) bundle ever
 /// reaches the consumer.
 /// </para>
@@ -133,22 +133,10 @@ public sealed class VideoPrefetchPump : IPlaybackFrameSource, IDisposable
     }
 
     /// <summary>
-    /// Reposition prefetch to <paramref name="frame"/>, preserving the current decode scale. Any
-    /// bundle the producer is mid-decoding self-cancels (generation mismatch at enqueue). UI thread.
-    /// </summary>
-    public void SeekTo(int frame)
-    {
-        double scale;
-        lock (_gate) 
-            scale = _scale;
-
-        Reprime(frame, scale);
-    }
-
-    /// <summary>
     /// Reposition prefetch to <paramref name="frame"/> at <paramref name="decodeScale"/>: bump the
-    /// generation, drain the queue, and re-prime from there. Like <see cref="SeekTo"/> but also sets
-    /// the decode scale — used to warm the buffer while paused at the preview's scale. UI thread.
+    /// generation, drain the queue, and re-prime from there. Any bundle the producer is mid-decoding
+    /// self-cancels (generation mismatch at enqueue). Used to warm the buffer while paused at the
+    /// preview's scale, and as the engine's seek path (via <see cref="Prefetch"/>). UI thread.
     /// </summary>
     public void Reprime(int frame, double decodeScale)
     {

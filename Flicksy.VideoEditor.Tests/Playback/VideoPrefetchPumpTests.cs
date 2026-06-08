@@ -202,7 +202,7 @@ public class VideoPrefetchPumpTests
         VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 4); // 0..3, then target 100 is past end → no reprime
         pump.Start(0);
         Assert.That(Wait(() => _fake.ProduceCount >= 4), Is.True);
-        pump.SeekTo(100);
+        pump.Reprime(100, 1.0);
         Assert.That(Wait(() => _fake.OutstandingCount == 0), Is.True, "seek did not flush all buffers");
     }
 
@@ -212,7 +212,7 @@ public class VideoPrefetchPumpTests
         VideoPrefetchPump pump = CreatePump(depth: 12, totalFrames: 56);
         pump.Start(50);
         Assert.That(Wait(() => _fake.HasProduced(55)), Is.True, "did not prime 50..55");
-        pump.SeekTo(10);
+        pump.Reprime(10, 1.0);
         Assert.That(Wait(() => _fake.HasProduced(10)), Is.True, "did not reprime from 10");
 
         Assert.That(pump.BeginFrame(10, 1.0), Is.True, "frame 10 should be served after backward seek");
@@ -230,7 +230,7 @@ public class VideoPrefetchPumpTests
         pump.Start(0);
         Assert.That(_fake.WaitEntered(Timeout), Is.True, "producer did not enter Produce");
 
-        pump.SeekTo(100);      // bump generation while frame 0's decode is in flight
+        pump.Reprime(100, 1.0); // bump generation while frame 0's decode is in flight
         _fake.ReleaseHold();   // frame 0 completes → stale generation → discarded, not enqueued
 
         Assert.That(Wait(() => _fake.HasProduced(100)), Is.True, "did not reprime after seek");
@@ -247,7 +247,7 @@ public class VideoPrefetchPumpTests
         for (int i = 0; i < 1000; i++)
         {
             int target = rng.Next(0, 9000);
-            pump.SeekTo(target);
+            pump.Reprime(target, 1.0);
             double scale = (i % 50 == 0) ? 0.5 : 1.0; // occasionally churn scale too
             if (pump.BeginFrame(target, scale))
                 pump.EndFrame();
