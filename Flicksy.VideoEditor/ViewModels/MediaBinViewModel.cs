@@ -300,15 +300,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
         {
             source.DisplayName = Path.GetFileNameWithoutExtension(newPath);
         }
-        source.Duration = probe.Duration;
-        source.HasVideo = probe.HasVideo;
-        source.HasAudio = probe.HasAudio;
-        source.Width = probe.Width;
-        source.Height = probe.Height;
-        source.SourceFramerate = probe.SourceFramerate;
-        source.SampleRate = probe.SampleRate;
-        source.ChannelCount = probe.ChannelCount;
-        source.IsMissing = false;
+        source.ApplyProbe(probe);
 
         // The existing thumbnail (if any) is now stale — IssueThumbnail clears it and
         // re-issues per the new stream layout. Minor race: if the worker is mid-decode
@@ -446,15 +438,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
 
     private void ApplyReprobe(MediaSource source, MediaSource probe)
     {
-        source.Duration = probe.Duration;
-        source.HasVideo = probe.HasVideo;
-        source.HasAudio = probe.HasAudio;
-        source.Width = probe.Width;
-        source.Height = probe.Height;
-        source.SourceFramerate = probe.SourceFramerate;
-        source.SampleRate = probe.SampleRate;
-        source.ChannelCount = probe.ChannelCount;
-        source.IsMissing = false;
+        source.ApplyProbe(probe);
 
         if (_wrappersById.TryGetValue(source.Id, out var wrapper))
         {

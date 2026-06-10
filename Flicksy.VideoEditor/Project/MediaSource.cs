@@ -48,12 +48,34 @@ public partial class MediaSource : ObservableObject
     [ObservableProperty]
     private double sourceFramerate;
 
+    [ObservableProperty]
+    private string videoCodec = string.Empty;
+
+    // FFmpeg's lowercase pixel-format name, e.g. "yuv420p".
+    [ObservableProperty]
+    private string pixelFormat = string.Empty;
+
+    [ObservableProperty]
+    private bool isVariableFramerate;
+
     // Audio-only metadata. Zero on video-only sources.
     [ObservableProperty]
     private int sampleRate;
 
     [ObservableProperty]
     private int channelCount;
+
+    [ObservableProperty]
+    private string audioCodec = string.Empty;
+
+    // Container-level metadata. Zero when unknown (e.g. stub sources). Bitrate is
+    // FFmpeg's container bit_rate in bits/s (FFMediaToolkit's XML doc says B/s, but the
+    // value is a raw copy of AVFormatContext.bit_rate).
+    [ObservableProperty]
+    private long fileSizeBytes;
+
+    [ObservableProperty]
+    private long bitrate;
 
     // Runtime flag — true if the source's file is no longer openable. Flipped by
     // MediaBinViewModel's on-focus File.Exists pass (both directions — present→missing
@@ -79,6 +101,8 @@ public partial class MediaSource : ObservableObject
             DisplayName = Path.GetFileNameWithoutExtension(fullPath),
             HasVideo = file.HasVideo,
             HasAudio = file.HasAudio,
+            FileSizeBytes = file.Info.FileInfo?.Length ?? 0,
+            Bitrate = file.Info.Bitrate,
         };
 
         var duration = TimeSpan.Zero;
@@ -89,7 +113,10 @@ public partial class MediaSource : ObservableObject
             source.Width = info.FrameSize.Width;
             source.Height = info.FrameSize.Height;
             source.SourceFramerate = info.AvgFrameRate;
-            if (info.Duration > duration) 
+            source.VideoCodec = info.CodecName;
+            source.PixelFormat = info.PixelFormat;
+            source.IsVariableFramerate = info.IsVariableFrameRate;
+            if (info.Duration > duration)
                 duration = info.Duration;
         }
 
@@ -98,11 +125,38 @@ public partial class MediaSource : ObservableObject
             AudioStreamInfo info = file.Audio.Info;
             source.SampleRate = info.SampleRate;
             source.ChannelCount = info.NumChannels;
-            if (info.Duration > duration) 
+            source.AudioCodec = info.CodecName;
+            if (info.Duration > duration)
                 duration = info.Duration;
         }
 
         source.Duration = duration;
         return source;
+    }
+
+    /// <summary>
+    /// Copies every probe-derived metadata field from <paramref name="probe"/> onto this
+    /// instance and clears <see cref="IsMissing"/>. Identity (<see cref="Id"/>) and naming
+    /// (<see cref="SourcePath"/>, <see cref="DisplayName"/>) are untouched — relocate
+    /// handles those itself. Single home for the field list so Relocate and the
+    /// missing→present re-probe can't drift apart as fields are added.
+    /// </summary>
+    public void ApplyProbe(MediaSource probe)
+    {
+        Duration = probe.Duration;
+        HasVideo = probe.HasVideo;
+        HasAudio = probe.HasAudio;
+        Width = probe.Width;
+        Height = probe.Height;
+        SourceFramerate = probe.SourceFramerate;
+        VideoCodec = probe.VideoCodec;
+        PixelFormat = probe.PixelFormat;
+        IsVariableFramerate = probe.IsVariableFramerate;
+        SampleRate = probe.SampleRate;
+        ChannelCount = probe.ChannelCount;
+        AudioCodec = probe.AudioCodec;
+        FileSizeBytes = probe.FileSizeBytes;
+        Bitrate = probe.Bitrate;
+        IsMissing = false;
     }
 }

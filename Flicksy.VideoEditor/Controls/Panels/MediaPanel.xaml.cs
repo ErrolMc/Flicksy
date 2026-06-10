@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -27,6 +28,10 @@ public partial class MediaPanel : UserControl
 {
     private Point _dragOriginScreen;
     private MediaSourceViewModel? _pendingDragEntry;
+
+    // Pixel height of the details row stashed across collapse so re-expanding restores
+    // the user's drag-resized size (mirrors VideoEditorWindow's left-panel width stash).
+    private GridLength _stashedDetailsHeight = GridLength.Auto;
 
     public MediaPanel()
     {
@@ -87,7 +92,12 @@ public partial class MediaPanel : UserControl
         ListBoxItem? item = FindAncestor<ListBoxItem>(d);
         if (item is null)
         {
-            if (vm.SelectedSource is not null) 
+            // Clicks on the details pane (header toggle, metadata rows, resize splitter)
+            // are interactions with the current selection — they must not clear it.
+            if (FindAncestor<Expander>(d) == DetailsExpander || FindAncestor<GridSplitter>(d) == DetailsSplitter)
+                return;
+
+            if (vm.SelectedSource is not null)
                 vm.SelectedSource = null;
             return;
         }
@@ -125,6 +135,46 @@ public partial class MediaPanel : UserControl
     private void OnPanelMouseLeave(object sender, MouseEventArgs e)
     {
         _pendingDragEntry = null;
+    }
+
+    // The details pane's row heights are code-behind-managed because the GridSplitter
+    // writes heights directly (a binding would be clobbered on the first drag) — same
+    // reasoning as VideoEditorWindow's panel columns.
+
+    // The splitter band is visible in both states for a consistent separator, but only
+    // resizes the expanded pane — a drag while collapsed would stretch the header-only
+    // row into dead space, so it's cancelled before it moves anything.
+    private void OnDetailsSplitterDragStarted(object sender, DragStartedEventArgs e)
+    {
+        if (!DetailsExpander.IsExpanded)
+            DetailsSplitter.CancelDrag();
+    }
+
+    // The splitter converts BodyRow and DetailsRow to pixel heights while dragging.
+    // Give the body its star back afterward so panel-height changes flex the bin list
+    // while the details pane keeps the user's chosen height.
+    private void OnDetailsSplitterDragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        BodyRow.Height = new GridLength(1, GridUnitType.Star);
+    }
+
+    private void OnDetailsExpanded(object sender, RoutedEventArgs e)
+    {
+        DetailsRow.MinHeight = 90;
+        if (_stashedDetailsHeight.IsAbsolute)
+            DetailsRow.Height = _stashedDetailsHeight;
+    }
+
+    // A drag-set pixel height must not survive collapse (the header-only row would keep
+    // the expanded height as dead space) — stash it for the next expand and return the
+    // row to Auto so it hugs the header. MinHeight likewise only applies while expanded.
+    private void OnDetailsCollapsed(object sender, RoutedEventArgs e)
+    {
+        if (DetailsRow.Height.IsAbsolute)
+            _stashedDetailsHeight = DetailsRow.Height;
+
+        DetailsRow.Height = GridLength.Auto;
+        DetailsRow.MinHeight = 0;
     }
 
     // DoDragDrop blocks the message loop until the drag completes. The cursor adorner

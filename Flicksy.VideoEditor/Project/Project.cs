@@ -75,8 +75,13 @@ public partial class Project : ObservableObject
             Width = 1920,
             Height = 1080,
             SourceFramerate = 30,
+            VideoCodec = "h264",
+            PixelFormat = "yuv420p",
             SampleRate = 48000,
             ChannelCount = 2,
+            AudioCodec = "aac",
+            FileSizeBytes = 3_000_000,
+            Bitrate = 8_000_000,
             IsMissing = true,
         };
         var clipB = new MediaSource
@@ -89,8 +94,13 @@ public partial class Project : ObservableObject
             Width = 1920,
             Height = 1080,
             SourceFramerate = 30,
+            VideoCodec = "h264",
+            PixelFormat = "yuv420p",
             SampleRate = 48000,
             ChannelCount = 2,
+            AudioCodec = "aac",
+            FileSizeBytes = 2_000_000,
+            Bitrate = 8_000_000,
             IsMissing = true,
         };
         var soundtrack = new MediaSource
@@ -101,6 +111,9 @@ public partial class Project : ObservableObject
             HasAudio = true,
             SampleRate = 44100,
             ChannelCount = 2,
+            AudioCodec = "mp3",
+            FileSizeBytes = 120_000,
+            Bitrate = 192_000,
             IsMissing = true,
         };
 

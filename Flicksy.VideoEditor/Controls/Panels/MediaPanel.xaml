@@ -23,6 +23,7 @@
         <SolidColorBrush x:Key="CellBadgeForegroundBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#1F1F1F" />
         <SolidColorBrush x:Key="ToolbarBorderBrush" Color="#3DFFFFFF" />
+        <SolidColorBrush x:Key="SplitterBrush" Color="#2A2A2A" />
 
         <Style x:Key="ImportButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="26" />
@@ -120,6 +121,98 @@
             </Setter>
         </Style>
 
+        <!-- Details pane typography: gray label column, light value column, small
+             section headers. SharedSizeGroup (set on the row grids) keeps the label
+             column aligned across the File/Video/Audio sections. -->
+        <Style x:Key="DetailLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource EmptyTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="0,1,10,1" />
+        </Style>
+        <Style x:Key="DetailValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource CellLabelBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="0,1,0,1" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="DetailSectionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource EmptyTextBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,8,0,2" />
+        </Style>
+
+        <!-- Dark collapsible header for the details pane. The chevron points right when
+             collapsed, down when expanded; the header label is fixed ("Details") so the
+             Expander's Header property is unused. -->
+        <Style x:Key="DetailsExpanderStyle" TargetType="Expander">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <DockPanel Background="{StaticResource ToolbarBackgroundBrush}">
+                            <ToggleButton DockPanel.Dock="Top"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Cursor="Hand"
+                                          Focusable="False">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="HeaderBg"
+                                                Background="{StaticResource ToolbarBackgroundBrush}"
+                                                Padding="10,6">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path x:Name="Chevron"
+                                                      Data="M 0 0 L 4 4 L 8 0"
+                                                      Stroke="{StaticResource EmptyTextBrush}"
+                                                      StrokeThickness="1.5"
+                                                      VerticalAlignment="Center"
+                                                      RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform Angle="-90" />
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                                <TextBlock Text="Details"
+                                                           Foreground="{StaticResource CellLabelBrush}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Margin="8,0,0,0"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="HeaderBg" Property="Background" Value="#2A2A2A" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Chevron" Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <RotateTransform Angle="0" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <!-- ScrollViewer so a splitter-shrunk pane scrolls its rows
+                                 instead of clipping them. Auto-sized (no drag yet) it
+                                 measures unbounded and shows no scrollbar. -->
+                            <ScrollViewer x:Name="ExpandSite"
+                                          Visibility="Collapsed"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ContentPresenter />
+                            </ScrollViewer>
+                        </DockPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="MediaCellTemplate">
             <Grid Margin="4">
                 <Grid.RowDefinitions>
@@ -195,9 +288,20 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <DockPanel>
+    <!-- Rows: toolbar / bin grid / details splitter / details pane. Row heights are
+         managed from code-behind on expand/collapse + splitter drag (a GridSplitter
+         writes heights directly, so they can't be bound — same approach as the editor
+         window's panel columns). -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition x:Name="BodyRow" Height="*" MinHeight="80" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition x:Name="DetailsRow" Height="Auto" />
+        </Grid.RowDefinitions>
+
         <!-- Toolbar -->
-        <Border DockPanel.Dock="Top"
+        <Border Grid.Row="0"
                 Background="{StaticResource ToolbarBackgroundBrush}"
                 BorderBrush="{StaticResource ToolbarBorderBrush}"
                 BorderThickness="0,0,0,1"
@@ -209,9 +313,185 @@
             </StackPanel>
         </Border>
 
+        <!-- The details pane's separator band, doubling as its resize handle. Always
+             visible so collapsed and expanded share one consistent separator, but it
+             only resizes while expanded: collapsed drags are cancelled at start
+             (OnDetailsSplitterDragStarted) and the cursor stays a plain arrow. The drag
+             converts BodyRow and DetailsRow to pixel heights;
+             OnDetailsSplitterDragCompleted gives the body its star back so panel-height
+             changes flex the list, not the details pane. -->
+        <GridSplitter x:Name="DetailsSplitter"
+                      Grid.Row="2"
+                      Height="4"
+                      HorizontalAlignment="Stretch"
+                      Background="{StaticResource SplitterBrush}"
+                      ShowsPreview="False"
+                      ResizeDirection="Rows"
+                      ResizeBehavior="PreviousAndNext"
+                      DragStarted="OnDetailsSplitterDragStarted"
+                      DragCompleted="OnDetailsSplitterDragCompleted">
+            <GridSplitter.Style>
+                <Style TargetType="GridSplitter">
+                    <Setter Property="Cursor" Value="Arrow" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsExpanded, ElementName=DetailsExpander}" Value="True">
+                            <Setter Property="Cursor" Value="SizeNS" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </GridSplitter.Style>
+        </GridSplitter>
+
+        <!-- Details pane — bottom row, collapsed by default. Shows the full probed
+             metadata of the selected source; rows bind to Source.* so a relocate or
+             missing→present re-probe updates them in place. The Expander keeps its own
+             IsExpanded for the window's lifetime (panels are visibility-toggled on rail
+             tab switches, never recreated). -->
+        <Expander x:Name="DetailsExpander"
+                  Grid.Row="3"
+                  Style="{StaticResource DetailsExpanderStyle}"
+                  IsExpanded="False"
+                  Expanded="OnDetailsExpanded"
+                  Collapsed="OnDetailsCollapsed">
+            <Grid Margin="10,4,10,10" Grid.IsSharedSizeScope="True">
+                <!-- No-selection hint; swapped for the rows below via the two styles. -->
+                <TextBlock Text="Select a media source"
+                           FontSize="11"
+                           Foreground="{StaticResource EmptyTextBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,4">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSource}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <StackPanel DataContext="{Binding SelectedSource}">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <TextBlock Text="File missing"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource CellMissingBrush}"
+                               Margin="0,2,0,2"
+                               Visibility="{Binding Source.IsMissing, Converter={StaticResource BoolToVis}}" />
+
+                    <!-- File rows -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="DetailLabel" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Style="{StaticResource DetailLabelStyle}" Text="Type" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.SourcePath, Converter={x:Static conv:FileTypeConverter.Instance}}" />
+                        <TextBlock Grid.Row="1" Style="{StaticResource DetailLabelStyle}" Text="Size" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.FileSizeBytes, Converter={x:Static conv:FileSizeConverter.Instance}}" />
+                        <TextBlock Grid.Row="2" Style="{StaticResource DetailLabelStyle}" Text="Duration" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.Duration, Converter={x:Static conv:DurationConverter.Instance}}" />
+                        <TextBlock Grid.Row="3" Style="{StaticResource DetailLabelStyle}" Text="Bitrate" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.Bitrate, Converter={x:Static conv:BitrateConverter.Instance}}" />
+                    </Grid>
+
+                    <!-- Video rows — hidden entirely for audio-only sources. -->
+                    <StackPanel Visibility="{Binding Source.HasVideo, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Style="{StaticResource DetailSectionStyle}" Text="VIDEO" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="DetailLabel" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Style="{StaticResource DetailLabelStyle}" Text="Resolution" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueStyle}"><Run Text="{Binding Source.Width, Mode=OneWay}" /><Run Text=" × " /><Run Text="{Binding Source.Height, Mode=OneWay}" /></TextBlock>
+                            <TextBlock Grid.Row="1" Style="{StaticResource DetailLabelStyle}" Text="Frame rate" />
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource DetailValueStyle}"
+                                           Text="{Binding Source.SourceFramerate, StringFormat={}{0:0.###} fps}" />
+                                <TextBlock Style="{StaticResource DetailValueStyle}"
+                                           Text=" (VFR)"
+                                           Visibility="{Binding Source.IsVariableFramerate, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                            <TextBlock Grid.Row="2" Style="{StaticResource DetailLabelStyle}" Text="Codec" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                       Text="{Binding Source.VideoCodec}" />
+                            <TextBlock Grid.Row="3" Style="{StaticResource DetailLabelStyle}" Text="Pixel format" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                       Text="{Binding Source.PixelFormat}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Audio rows, or an explicit "No audio" line for video-only sources. -->
+                    <TextBlock Style="{StaticResource DetailSectionStyle}" Text="AUDIO" />
+                    <Grid Visibility="{Binding Source.HasAudio, Converter={StaticResource BoolToVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="DetailLabel" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Style="{StaticResource DetailLabelStyle}" Text="Codec" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.AudioCodec}" />
+                        <TextBlock Grid.Row="1" Style="{StaticResource DetailLabelStyle}" Text="Channels" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.ChannelCount, Converter={x:Static conv:ChannelCountConverter.Instance}}" />
+                        <TextBlock Grid.Row="2" Style="{StaticResource DetailLabelStyle}" Text="Sample rate" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DetailValueStyle}"
+                                   Text="{Binding Source.SampleRate, StringFormat={}{0:N0} Hz}" />
+                    </Grid>
+                    <TextBlock Text="No audio"
+                               FontSize="11"
+                               Foreground="{StaticResource EmptyTextBrush}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Source.HasAudio}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </Expander>
+
         <!-- Body: empty-state hint OR the bin grid. Always-visible Import button stays on
              the toolbar above either branch. -->
-        <Grid>
+        <Grid Grid.Row="1">
             <TextBlock Text="No media imported"
                        Foreground="{StaticResource EmptyTextBrush}"
                        FontSize="13"
@@ -219,24 +499,25 @@
                        VerticalAlignment="Center"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" />
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Visibility="{Binding HasEntries, Converter={StaticResource BoolToVis}}">
-                <ListBox x:Name="EntriesList"
-                         ItemsSource="{Binding MediaSources}"
-                         SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
-                         ItemTemplate="{StaticResource MediaCellTemplate}"
-                         ItemContainerStyle="{StaticResource MediaCellItemStyle}"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                </ListBox>
-            </ScrollViewer>
+            <!-- The ListBox scrolls via its own template ScrollViewer — wrapping it in
+                 an outer one breaks wheel scrolling (the inner viewer swallows wheel
+                 events while the outer holds the actual overflow). -->
+            <ListBox x:Name="EntriesList"
+                     ItemsSource="{Binding MediaSources}"
+                     SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
+                     ItemTemplate="{StaticResource MediaCellTemplate}"
+                     ItemContainerStyle="{StaticResource MediaCellItemStyle}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     Visibility="{Binding HasEntries, Converter={StaticResource BoolToVis}}">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+            </ListBox>
         </Grid>
-    </DockPanel>
+    </Grid>
 </UserControl>
