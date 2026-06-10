@@ -5,6 +5,7 @@ using System.Windows;
 using Flicksy.Drawing.Media;
 using Flicksy.VideoEditor.ViewModels;
 using Flicksy.VideoEditor.Windows;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -49,6 +50,13 @@ public partial class App : Application
         builder.Services.AddTransient<WelcomeWindow>();
         _host = builder.Build();
         _host.Start();
+
+        // Read-once kill switch (ADR 0010), pushed into the Drawing library because the library
+        // itself reads no configuration. Must be set before the first preview render constructs
+        // a decoder — EditorWithSource composites during window construction below.
+        IConfiguration configuration = _host.Services.GetRequiredService<IConfiguration>();
+        HardwareMediaDecoder.Disabled =
+            bool.TryParse(configuration["DisableHardwareDecode"], out bool disableHwDecode) && disableHwDecode;
 
         StartupMode mode = ResolveStartupMode(e.Args);
         Window window = mode switch

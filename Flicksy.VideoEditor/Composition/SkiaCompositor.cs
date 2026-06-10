@@ -83,7 +83,7 @@ public sealed class SkiaCompositor : ICompositor
 
         // Decode source: the caller's prefetch provider during playback, else the lazily-created
         // synchronous one (decodes on this thread — the canonical export/scrub/static path).
-        IClipFrameProvider activeFrames = frames ?? (_defaultFrames ??= new DecodingFrameProvider(sampleRate));
+        IClipFrameProvider activeFrames = frames ?? (_defaultFrames ??= new DecodingFrameProvider(sampleRate, preferHardwareVideo: true));
 
         target.Lock();
         try

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Flicksy.Drawing.Media;
 using Flicksy.VideoEditor.Project;
 
@@ -21,7 +22,18 @@ namespace Flicksy.VideoEditor.Composition;
 public sealed class MediaDecoderCache : IDisposable
 {
     private readonly Dictionary<Guid, (IMediaDecoder Decoder, double Scale)> _decoders = new();
+    private readonly bool _preferHardwareVideo;
     private bool _disposed;
+
+    /// <summary>
+    /// <paramref name="preferHardwareVideo"/> opts this cache's decoders into hardware video
+    /// decode with silent per-source software fallback (ADR 0010). Video seams opt in; the
+    /// audio seam must not — <see cref="HardwareMediaDecoder"/> decodes no audio.
+    /// </summary>
+    public MediaDecoderCache(bool preferHardwareVideo = false)
+    {
+        _preferHardwareVideo = preferHardwareVideo;
+    }
 
     /// <summary>
     /// Return the decoder for <paramref name="clip"/>, opening it on first reference. Returns
@@ -64,7 +76,7 @@ public sealed class MediaDecoderCache : IDisposable
 
         try
         {
-            var decoder = new FFmpegMediaDecoder(path, targetSampleRate, ResolveTargetSize(source!, decodeScale));
+            IMediaDecoder decoder = CreateDecoder(source!, path, targetSampleRate, decodeScale);
             _decoders[clip.Id] = (decoder, decodeScale);
             return decoder;
         }
@@ -74,6 +86,28 @@ public sealed class MediaDecoderCache : IDisposable
             // rest of the pipeline; a diagnostics hook lands with the logging work.
             return null;
         }
+    }
+
+    private IMediaDecoder CreateDecoder(MediaSource source, string path, int targetSampleRate, double decodeScale)
+    {
+        System.Drawing.Size? targetSize = ResolveTargetSize(source, decodeScale);
+
+        if (_preferHardwareVideo && source.HasVideo && HardwareMediaDecoder.IsAvailable)
+        {
+            try
+            {
+                return new HardwareMediaDecoder(path, targetSize);
+            }
+            catch (Exception exception)
+            {
+                // Per-source fallback (ADR 0010): unsupported codec or profile, device loss, an
+                // FFmpeg build without hwaccels — the software decoder handles everything the
+                // hardware one refuses.
+                Debug.WriteLine($"[hwdecode] falling back to software for '{path}': {exception.Message}");
+            }
+        }
+
+        return new FFmpegMediaDecoder(path, targetSampleRate, targetSize);
     }
 
     // Below project resolution, decode proxy-sized frames (swscale rescales post-decode). At

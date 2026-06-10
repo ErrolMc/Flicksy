@@ -118,7 +118,7 @@ A view-only setting that renders the **preview** at a fraction of project resolu
 _Avoid_: "proxy" / "proxy mode" for this (reserve "proxy media" for the separate, unbuilt pre-transcoded-file workflow), "low-quality mode", "draft mode"; applying it to export (export is always full resolution).
 
 **Media decoder**:
-Per-source primitive that produces raw video frames or audio samples from a single source file at a given `SourceTime`. Pull-shaped (synchronous `GetVideoFrameAt(t)` / `GetAudioSamplesAt(t, n)`), no playback clock. Distinct from `IVideoPlayer`, which is push-shaped and owns its own clock for the snip editor's video playback. Lives in `Flicksy.Drawing/Media/` so it's available to both surfaces; the eventual unification of PostSnip's playback onto `IMediaDecoder` is tracked in issue #23.
+Per-source primitive that produces raw video frames or audio samples from a single source file at a given `SourceTime`. Pull-shaped (synchronous `GetVideoFrameAt(t)` / `GetAudioSamplesAt(t, n)`), no playback clock. Distinct from `IVideoPlayer`, which is push-shaped and owns its own clock for the snip editor's video playback. Lives in `Flicksy.Drawing/Media/` so it's available to both surfaces; the eventual unification of PostSnip's playback onto `IMediaDecoder` is tracked in issue #23. The video editor's video seams prefer the hardware implementation (`HardwareMediaDecoder`; CUDA on NVIDIA, d3d11va otherwise) per source, silently falling back to the software decoder; audio always decodes in software (ADR 0010).
 _Avoid_: bare "decoder" without "media" prefix, "player" (that's `IVideoPlayer`'s shape).
 
 **Decode-ahead pump (prefetch pump)**:

@@ -26,4 +26,10 @@
     <Using Include="Flicksy.Icons.Properties.Resources" Alias="Images" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

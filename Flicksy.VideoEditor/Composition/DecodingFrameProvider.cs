@@ -24,9 +24,13 @@ public sealed class DecodingFrameProvider : IClipFrameProvider, IDisposable
     private readonly int _sampleRate;
     private readonly bool _ownsCache;
 
-    /// <summary>Create a provider owning a fresh <see cref="MediaDecoderCache"/>.</summary>
-    public DecodingFrameProvider(int sampleRate)
-        : this(new MediaDecoderCache(), sampleRate, ownsCache: true)
+    /// <summary>
+    /// Create a provider owning a fresh <see cref="MediaDecoderCache"/>.
+    /// <paramref name="preferHardwareVideo"/> opts the cache into hardware video decode with
+    /// per-source software fallback (ADR 0010).
+    /// </summary>
+    public DecodingFrameProvider(int sampleRate, bool preferHardwareVideo = false)
+        : this(new MediaDecoderCache(preferHardwareVideo), sampleRate, ownsCache: true)
     {
     }
 

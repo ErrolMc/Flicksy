@@ -17,6 +17,12 @@ public static class FfmpegLocator
                 "set the FFMPEG_HOME environment variable, or place the DLLs in 'lib\\ffmpeg' next to the application.");
 
         FFMediaToolkit.FFmpegLoader.FFmpegPath = path;
+
+        // HardwareMediaDecoder calls FFmpeg.AutoGen directly (no FFMediaToolkit in between), and a
+        // preview render can be the process's first FFmpeg touch — so the AutoGen loader must be
+        // pointed at the same directory explicitly rather than relying on FFMediaToolkit's first
+        // MediaFile.Open to do it.
+        FFmpeg.AutoGen.ffmpeg.RootPath = path;
     }
 
     private static string? LocateFfmpegBinDirectory()

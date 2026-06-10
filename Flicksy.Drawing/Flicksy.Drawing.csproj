@@ -6,11 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <RootNamespace>Flicksy.Drawing</RootNamespace>
+    <!-- HardwareMediaDecoder talks to FFmpeg.AutoGen's raw pointer API. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="FFMediaToolkit" Version="4.8.1" />
+	<PackageReference Include="FFmpeg.AutoGen" Version="7.1.1" />
   </ItemGroup>
 
   <ItemGroup>

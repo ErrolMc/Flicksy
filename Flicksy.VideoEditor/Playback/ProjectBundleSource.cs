@@ -25,7 +25,7 @@ public sealed class ProjectBundleSource : IFrameBundleSource
     public ProjectBundleSource(Project.Project project, Func<int> totalFrames)
     {
         _project = project;
-        _frames = new DecodingFrameProvider(project.Settings.AudioSampleRate);
+        _frames = new DecodingFrameProvider(project.Settings.AudioSampleRate, preferHardwareVideo: true);
         _totalFrames = totalFrames;
     }
 
@@ -48,20 +48,20 @@ public sealed class ProjectBundleSource : IFrameBundleSource
         var frames = new Dictionary<Guid, VideoFrame>();
         foreach (CompositionLayer layer in layers)
         {
-            if (layer.Track.Kind == TrackKind.Audio) 
+            if (layer.Track.Kind == TrackKind.Audio)
                 continue;
 
-            if (layer.Clip is not MediaClip clip) 
+            if (layer.Clip is not MediaClip clip)
                 continue;   // GraphicsClip → painted inline
 
-            if (clip.Streams == ClipStreams.Audio) 
+            if (clip.Streams == ClipStreams.Audio)
                 continue;  // audio-only → no video
 
-            if (clip.IsBroken) 
+            if (clip.IsBroken)
                 continue;
 
             VideoFrame? f = _frames.Acquire(clip, layer.SourceTime, decodeScale);
-            if (f is not null) 
+            if (f is not null)
                 frames[clip.Id] = f.Value;
         }
 
