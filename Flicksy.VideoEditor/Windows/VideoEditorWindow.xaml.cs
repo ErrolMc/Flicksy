@@ -93,8 +93,8 @@ public partial class VideoEditorWindow : Window
         ViewModel.Dispose();
     }
 
-    // Window-level NLE shortcuts. All are ignored while a text box has focus (the project-name box
-    // and inline clip/bin rename need the keys for typing) and on auto-repeat. Handled here
+    // Window-level NLE shortcuts. All are ignored while a text box has focus (inline clip/bin
+    // rename needs the keys for typing) and on auto-repeat. Handled here
     // (PreviewKeyDown) so Space overrides Space-activates-button on the transport buttons.
     //   Space            — play/pause (any modifier, matching the prior behavior).
     //   S / Delete / C   — split selection at playhead / delete selection / toggle razor mode.

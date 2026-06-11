@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Flicksy.Drawing.Undo;
 using Flicksy.VideoEditor.Composition;
 using Flicksy.VideoEditor.Playback;
@@ -12,13 +11,13 @@ namespace Flicksy.VideoEditor.ViewModels;
 
 /// <summary>
 /// Root view-model for the video editor shell. Owns the document <see cref="Project"/>
-/// plus the per-surface sub-VMs (<see cref="Preview"/>, <see cref="Transport"/>,
-/// <see cref="Timeline"/>, <see cref="Inspector"/>, <see cref="MediaBin"/>) and the shell
-/// UI state (selection, panel open/closed, rail tab). Owns the editor's <see cref="History"/>
+/// plus the per-surface sub-VMs (<see cref="TitleBar"/>, <see cref="Preview"/>,
+/// <see cref="Transport"/>, <see cref="Timeline"/>, <see cref="Inspector"/>,
+/// <see cref="MediaBin"/>) and the shell UI state (selection, panel open/closed, rail tab). Owns the editor's <see cref="History"/>
 /// (one <see cref="UndoManager"/> per editor window, mirroring PostSnip's
-/// <c>DrawingViewModel.History</c>); the shell's <c>Ctrl+Z</c>/<c>Ctrl+Y</c> bindings and the
-/// toolbar Undo/Redo buttons invoke <c>History.UndoCommand</c>/<c>RedoCommand</c>. Timeline-edit
-/// commands push onto it as #12's gesture tools land.
+/// <c>DrawingViewModel.History</c>); the shell's <c>Ctrl+Z</c>/<c>Ctrl+Y</c> bindings invoke
+/// <c>History.UndoCommand</c>/<c>RedoCommand</c>. Timeline-edit commands push onto it as #12's
+/// gesture tools land.
 /// </summary>
 public partial class VideoEditorViewModel : ObservableObject, IDisposable
 {
@@ -54,11 +53,12 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         Transport = new TransportViewModel(project);
         Preview = new PreviewViewModel(project, Transport, _compositor);
         // History is a property initializer (runs before this body) so it's non-null here;
-        // share the one UndoManager instance with the timeline so gesture tools and the
-        // toolbar Undo/Redo buttons push to / read from the same stack.
+        // share the one UndoManager instance with the timeline and the title bar's Edit
+        // menu so gesture tools and menu Undo/Redo push to / read from the same stack.
         Timeline = new TimelineViewModel(project, Transport, History);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
+        TitleBar = new TitleBarViewModel(History);
 
         // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
         // Transport (which Preview, Timeline and the ruler already observe). Attach after both
@@ -95,6 +95,8 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     public Project.Project Project { get; }
 
+    public TitleBarViewModel TitleBar { get; }
+
     public PreviewViewModel Preview { get; }
 
     public TransportViewModel Transport { get; }
@@ -111,8 +113,8 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// The editor's undo stack. Timeline-edit gestures (#12) push before/after-snapshot
-    /// commands here; the toolbar buttons + Ctrl+Z/Ctrl+Y bind to its
-    /// <see cref="UndoManager.UndoCommand"/> / <see cref="UndoManager.RedoCommand"/>.
+    /// commands here; Ctrl+Z/Ctrl+Y bind to its <see cref="UndoManager.UndoCommand"/> /
+    /// <see cref="UndoManager.RedoCommand"/>.
     /// </summary>
     public UndoManager History { get; } = new();
 
@@ -130,12 +132,6 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         {
             SelectedClip = Timeline.SelectedClip;
         }
-    }
-
-    [RelayCommand]
-    private void Export()
-    {
-        // No-op in this slice. Real exporter lands in #20.
     }
 
     public void Dispose()

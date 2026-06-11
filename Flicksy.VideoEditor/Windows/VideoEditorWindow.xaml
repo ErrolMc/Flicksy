@@ -14,6 +14,15 @@
         MinWidth="800"
         WindowStartupLocation="CenterScreen"
         Background="#121212">
+    <!-- Custom chrome: the native title bar is replaced by the TitleBarView row below so
+         the File/Edit menus can sit next to the title. CaptionHeight must match that
+         control's Height; drag / double-click-maximize / snap come from WindowChrome. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="32"
+                      ResizeBorderThickness="{x:Static SystemParameters.WindowResizeBorderThickness}"
+                      GlassFrameThickness="-1"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
     <Window.InputBindings>
         <KeyBinding Modifiers="Control" Key="Z" Command="{Binding History.UndoCommand}" />
         <KeyBinding Modifiers="Control" Key="Y" Command="{Binding History.RedoCommand}" />
@@ -22,110 +31,32 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <conv:EnumToVisibilityConverter x:Key="EnumToVis" />
 
-        <SolidColorBrush x:Key="ChromeBackgroundBrush" Color="#202020" />
         <SolidColorBrush x:Key="ChromeBorderBrush" Color="#3DFFFFFF" />
         <SolidColorBrush x:Key="RailBackgroundBrush" Color="#1A1A1A" />
         <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#181818" />
         <SolidColorBrush x:Key="CenterBackgroundBrush" Color="#111111" />
         <SolidColorBrush x:Key="SplitterBrush" Color="#2A2A2A" />
 
-        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="28" />
-            <Setter Property="MinWidth" Value="64" />
-            <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#2B2B2B" />
-            <Setter Property="BorderBrush" Value="#55FFFFFF" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#3A3A3A" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#222222" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.4" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="PrimaryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
-            <Setter Property="Background" Value="#0078D4" />
-            <Setter Property="BorderBrush" Value="#0078D4" />
-        </Style>
-
-        <Style x:Key="ProjectNameBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="#1A1A1A" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="#3DFFFFFF" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Height" Value="28" />
-            <Setter Property="MinWidth" Value="220" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="CaretBrush" Value="White" />
-        </Style>
     </Window.Resources>
 
     <Grid>
+        <Grid.Style>
+            <!-- A maximized window overhangs the monitor by its (now invisible) resize
+                 frame on every side; pull the content back in so nothing is clipped. -->
+            <Style TargetType="Grid">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="Margin" Value="8" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Top toolbar -->
-        <Border Grid.Row="0"
-                Background="{StaticResource ChromeBackgroundBrush}"
-                BorderBrush="{StaticResource ChromeBorderBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="12,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBox Style="{StaticResource ProjectNameBoxStyle}"
-                             Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <Button Style="{StaticResource ToolbarButtonStyle}"
-                            Content="Undo"
-                            Margin="0,0,8,0"
-                            Command="{Binding History.UndoCommand}" />
-                    <Button Style="{StaticResource ToolbarButtonStyle}"
-                            Content="Redo"
-                            Command="{Binding History.RedoCommand}" />
-                </StackPanel>
-
-                <Button Grid.Column="2"
-                        Style="{StaticResource PrimaryToolbarButtonStyle}"
-                        Content="Export"
-                        Command="{Binding ExportCommand}" />
-            </Grid>
-        </Border>
+        <controls:TitleBarView Grid.Row="0" DataContext="{Binding TitleBar}" />
 
         <!-- Main 5-column body. Panel column widths are managed from code-behind
              so GridSplitter drags can update them without clobbering a binding,
