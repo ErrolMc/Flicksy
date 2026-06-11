@@ -409,6 +409,7 @@ Timeline undo commands live in [Flicksy.VideoEditor/Undo/](../Flicksy.VideoEdito
 | --- | --- |
 | [Resources/*.png](../Flicksy.Icons/Resources) | Toolbar + shape + rotate-puck icons + media-bin audio glyph, 19 PNGs. |
 | [Resources/music-file.png](../Flicksy.Icons/Resources/music-file.png) | Audio-source glyph used by the media bin (`Images.music_file`). |
+| [Resources/app-icon.ico](../Flicksy.Icons/Resources/app-icon.ico) / [.png](../Flicksy.Icons/Resources/app-icon.png) | The Flicksy app icon (multi-resolution `.ico`: 16/24/32/48/64/128/256, regenerated from the 500x500 `.png`). Source of truth for all four exe icons. |
 | [Properties/Resources.resx](../Flicksy.Icons/Properties/Resources.resx) | ResXFileRef entries pointing at the PNGs. |
 | [Properties/Resources.Designer.cs](../Flicksy.Icons/Properties/Resources.Designer.cs) | Strongly-typed `public` accessor. **Hand-edited from internal → public**; csproj `Generator` is `PublicResXFileCodeGenerator` so future regens stay public. |
 
@@ -423,6 +424,8 @@ The alias is **declared once per consumer csproj** as a csproj-level global usin
 [Flicksy.Drawing.csproj](../Flicksy.Drawing/Flicksy.Drawing.csproj), [Flicksy.PostSnip.csproj](../Flicksy.PostSnip/Flicksy.PostSnip.csproj), and [Flicksy.VideoEditor.csproj](../Flicksy.VideoEditor/Flicksy.VideoEditor.csproj) all declare this. Call sites use it bare: `Images.rotate`, `Images.circle`, `Images.cursor.ToImageSource()`, `Images.music_file.ToImageSource()`, etc.
 
 The alias name is `Images` rather than `Icons` because a using-alias of `Icons` would be shadowed by the `Flicksy.Icons` namespace at every call site (C# §13.6 resolves namespace members before using aliases).
+
+**App icon**: all four WinExes set `<ApplicationIcon>..\Flicksy.Icons\Resources\app-icon.ico</ApplicationIcon>` — a build-time file path, so Agent and Snipper consume it without a project reference to Icons. This embeds the icon into each exe (Explorer + taskbar), and WPF uses it as the default window icon for Snipper/PostSnip/VideoEditor windows automatically. The Agent tray `NotifyIcon` is the one place that needs explicit wiring (WinForms doesn't apply `ApplicationIcon` to a `NotifyIcon`): [AgentApplicationContext.LoadApplicationIcon](../Flicksy.Agent/AgentApplicationContext.cs) reads the embedded icon back out via `Icon.ExtractAssociatedIcon(Environment.ProcessPath)`.
 
 ## 8. Conventions seen in this codebase
 
@@ -449,6 +452,7 @@ The alias name is `Images` rather than `Icons` because a using-alias of `Icons` 
 | Modify save format | [PostSnipViewModel.Save](../Flicksy.PostSnip/ViewModels/PostSnipViewModel.cs) + `SaveImageWithDrawing`. |
 | Change toolbar layout | [ImageEditToolsView.xaml](../Flicksy.PostSnip/Controls/ImageEditToolsView.xaml) + [PostSnipWindow.xaml](../Flicksy.PostSnip/PostSnipWindow.xaml). |
 | Add a new shared icon | drop PNG into [Flicksy.Icons/Resources/](../Flicksy.Icons/Resources), add entry to [Resources.resx](../Flicksy.Icons/Properties/Resources.resx), regenerate `Resources.Designer.cs` (or hand-add a public property). Consume via `Images.<name>`. |
+| Change the app / tray icon | replace [Flicksy.Icons/Resources/app-icon.ico](../Flicksy.Icons/Resources/app-icon.ico) (all four exes point `<ApplicationIcon>` at it); tray icon loads it in [AgentApplicationContext.LoadApplicationIcon](../Flicksy.Agent/AgentApplicationContext.cs). See §7. |
 | Add a video-editor rail tab | extend [LeftRailTab](../Flicksy.VideoEditor/ViewModels/LeftRailTab.cs) or [RightRailTab](../Flicksy.VideoEditor/ViewModels/RightRailTab.cs), add a `RailItem` in [VideoEditorViewModel](../Flicksy.VideoEditor/ViewModels/VideoEditorViewModel.cs) ctor, add a stub class in `Controls/Panels/` or `Controls/Inspectors/`, wire its `Visibility` in [VideoEditorWindow.xaml](../Flicksy.VideoEditor/Windows/VideoEditorWindow.xaml) with `EnumToVisibilityConverter`. |
 | Add a new timeline clip subtype | new class in [Project/](../Flicksy.VideoEditor/Project) inheriting `Clip`, plus a `DataTemplate` keyed to the type in [ClipView.xaml](../Flicksy.VideoEditor/Controls/Timeline/ClipView.xaml). |
 | Drag from bin to timeline | drag-source side: `OnPanelPreviewMouseDown` / `OnPanelPreviewMouseMove` / `StartDrag` in [MediaPanel.xaml.cs](../Flicksy.VideoEditor/Controls/Panels/MediaPanel.xaml.cs) (plus `DragThumbnailAdorner` for the cursor follower). Drop-target side: `OnDragOver` / `OnDrop` / `ResolveStreams` (the drop matrix) / `GhostClipAdorner` in [ClipsLaneView](../Flicksy.VideoEditor/Controls/Timeline/ClipsLaneView.cs). Snap + non-destructive overlap: `TimelineViewModel.Snap` in [TimelineViewModel.cs](../Flicksy.VideoEditor/ViewModels/TimelineViewModel.cs). Undoable insert: `TimelineViewModel.AddClip` → [AddClipCommand](../Flicksy.VideoEditor/Undo/Commands/AddClipCommand.cs). Drops onto a `Locked` track are refused (ADR 0006). |

@@ -9,6 +9,7 @@ internal sealed class AgentApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly HotKeyWindow _hotKeyWindow;
+    private readonly Icon _trayIcon;
 
     public AgentApplicationContext()
     {
@@ -19,9 +20,10 @@ internal sealed class AgentApplicationContext : ApplicationContext
         menu.Items.Add("New Video Project", null, (_, _) => LaunchVideoEditor());
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
+        _trayIcon = LoadApplicationIcon();
         _notifyIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _trayIcon,
             Visible = true,
             Text = "Flicksy Agent",
             ContextMenuStrip = menu
@@ -39,8 +41,20 @@ internal sealed class AgentApplicationContext : ApplicationContext
     {
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        if (!ReferenceEquals(_trayIcon, SystemIcons.Application))
+            _trayIcon.Dispose();
         _hotKeyWindow.Dispose();
         base.ExitThreadCore();
+    }
+
+    private static Icon LoadApplicationIcon()
+    {
+        string? exePath = Environment.ProcessPath;
+        if (exePath is null)
+            return SystemIcons.Application;
+
+        Icon? extracted = Icon.ExtractAssociatedIcon(exePath);
+        return extracted ?? SystemIcons.Application;
     }
 
     private void LaunchSnipper()

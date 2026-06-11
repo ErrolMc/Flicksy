@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>..\Flicksy.Icons\Resources\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
