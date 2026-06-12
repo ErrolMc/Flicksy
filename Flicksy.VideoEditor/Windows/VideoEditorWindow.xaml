@@ -177,5 +177,16 @@
                                IsPanelOpen="{Binding IsRightPanelOpen, Mode=TwoWay}" />
             </Border>
         </Grid>
+
+        <!-- Modal overlay layer (Project Settings, Settings, future Export): dim backdrop +
+             centered tile spanning both rows so it covers the title bar as well as the
+             body. State + tile templates live on OverlayHostViewModel / OverlayHost; mouse
+             input stops at the dim layer; Esc + editor-shortcut gating live in
+             OnPreviewKeyDown. The top 32px remain caption-draggable (the host doesn't opt
+             into chrome hit-testing), which also keeps the menus and caption buttons
+             blocked while an overlay is open. -->
+        <controls:OverlayHost Grid.Row="0"
+                              Grid.RowSpan="2"
+                              DataContext="{Binding OverlayHost}" />
     </Grid>
 </Window>

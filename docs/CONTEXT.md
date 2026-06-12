@@ -19,6 +19,10 @@ _Avoid_: "snipping tool" (overloaded with the Windows utility), "annotation".
 The NLE surface for assembling multiple clips into a finished video. Lives in `VideoEditorWindow`. Document is a timeline.
 _Avoid_: "movie editor", "video maker".
 
+**Shell overlay**:
+The video editor's in-window modal layer: a dim backdrop over the whole editor window with one centered tile (Project Settings, Settings, future Export). One at a time, shown through the root VM's `OverlayHost`. Distinct from the `Overlay` *track kind* — say "shell overlay" (or name the specific tile) when the track kind could be in scope.
+_Avoid_: "dialog window" / "popup" (no OS window is involved — it is a layer inside the editor window).
+
 ### Video editor document
 
 **Project**:

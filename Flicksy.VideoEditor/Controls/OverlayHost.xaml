@@ -1,0 +1,22 @@
+<UserControl x:Class="Flicksy.VideoEditor.Controls.OverlayHost"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Overlay-VM → tile-view DataTemplates are app-wide implicit templates in App.xaml,
+         so the ContentPresenter below resolves them without local resources. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <!-- Dim layer over the whole window. Backdrop clicks light-dismiss (code-behind);
+         the presenter marks tile clicks handled so they never reach the backdrop
+         handler. Collapsed when no overlay is open, which also makes this control
+         hit-test transparent (the UserControl itself has no background). -->
+    <Grid Background="#AA000000"
+          Visibility="{Binding IsOverlayOpen, Converter={StaticResource BoolToVis}}"
+          MouseLeftButtonDown="OnBackdropMouseLeftButtonDown">
+        <ContentPresenter HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Content="{Binding CurrentOverlay}"
+                          MouseLeftButtonDown="OnTileMouseLeftButtonDown" />
+    </Grid>
+</UserControl>

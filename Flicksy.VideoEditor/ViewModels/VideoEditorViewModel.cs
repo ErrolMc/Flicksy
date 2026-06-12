@@ -58,7 +58,7 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         Timeline = new TimelineViewModel(project, Transport, History);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
-        TitleBar = new TitleBarViewModel(History);
+        TitleBar = new TitleBarViewModel(History, OpenProjectSettings, OpenSettings);
 
         // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
         // Transport (which Preview, Timeline and the ruler already observe). Attach after both
@@ -118,6 +118,13 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public UndoManager History { get; } = new();
 
+    /// <summary>
+    /// The shell's modal overlay layer (Project Settings / Settings / future Export).
+    /// <see cref="Controls.OverlayHost"/> binds this; the window's key handling
+    /// light-dismisses on Esc and gates editor shortcuts while an overlay is open.
+    /// </summary>
+    public OverlayHostViewModel OverlayHost { get; } = new();
+
     partial void OnSelectedClipChanged(Clip? value)
     {
         if (Timeline.SelectedClip != value)
@@ -134,9 +141,29 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Opens the Project Settings overlay. Passed into <see cref="TitleBarViewModel"/>
+    /// as the File menu's Project Settings handler so the title bar VM never needs a
+    /// root-VM reference. No <c>onClosed</c> — nothing reacts to dismissal yet.
+    /// </summary>
+    public void OpenProjectSettings()
+    {
+        OverlayHost.Show(new ProjectSettingsOverlayViewModel(Project.Settings, OverlayHost.Close));
+    }
+
+    /// <summary>
+    /// Opens the editor Settings overlay (the title bar's gear button). The panel is a
+    /// placeholder shell for now — its single option is a no-op — so no <c>onClosed</c>
+    /// is needed.
+    /// </summary>
+    public void OpenSettings()
+    {
+        OverlayHost.Show(new SettingsOverlayViewModel(OverlayHost.Close));
+    }
+
     public void Dispose()
     {
-        if (_disposed) 
+        if (_disposed)
             return;
 
         _disposed = true;

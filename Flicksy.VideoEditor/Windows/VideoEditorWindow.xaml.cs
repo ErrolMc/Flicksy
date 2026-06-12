@@ -99,15 +99,31 @@ public partial class VideoEditorWindow : Window
     //   Space            — play/pause (any modifier, matching the prior behavior).
     //   S / Delete / C   — split selection at playhead / delete selection / toggle razor mode.
     // The edit keys are bare-key only so Ctrl/Alt chords (Ctrl+Z undo, a future Ctrl+S save) pass
-    // through. Esc-cancel + razor-exit live on TimelineView's window hook (it owns the tool router).
+    // through. Esc-cancel + razor-exit live on TimelineView's window hook (it owns the tool router);
+    // marking Esc handled in the modal gate below runs first (class handler before instance
+    // handlers), so closing the overlay wins over razor-exit.
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
 
-        if (e.IsRepeat) 
+        if (e.IsRepeat)
             return;
 
-        if (Keyboard.FocusedElement is TextBoxBase) 
+        // Modal gate: while any overlay (Project Settings, Settings, …) is up, Esc
+        // light-dismisses it and every editor shortcut below is suppressed (the dim layer
+        // blocks the mouse). Esc is swallowed even when the overlay refuses light dismissal
+        // so it can't leak through to the timeline's razor-exit hook.
+        if (ViewModel.OverlayHost.IsOverlayOpen)
+        {
+            if (e.Key == Key.Escape)
+            {
+                ViewModel.OverlayHost.TryLightDismiss();
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (Keyboard.FocusedElement is TextBoxBase)
             return;
 
         if (e.Key == Key.Space)

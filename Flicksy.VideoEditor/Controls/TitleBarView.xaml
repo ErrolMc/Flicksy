@@ -35,6 +35,36 @@
             </Setter>
         </Style>
 
+        <!-- Rounded translucent-white chip hover, matching the File/Edit menu headers
+             (MenuBarItemStyle) rather than the solid full-height caption-button fill, so
+             the gear button reads as a peer of the menu bar. -->
+        <Style x:Key="TitleBarChipButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chip"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="#3A3A3A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="MaximizeRestoreCaptionButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
             <Setter Property="Content" Value="&#xE922;" />
             <Setter Property="ToolTip" Value="Maximize" />
@@ -192,8 +222,9 @@
                    VerticalAlignment="Center" />
 
         <!-- Undo/Redo drive the editor's shared UndoManager (TitleBarViewModel.History),
-             auto-disabling with the stacks. The remaining commands are intentionally
-             empty TitleBarViewModel placeholders; export / save / project settings /
+             auto-disabling with the stacks. Project Settings opens the root VM's
+             overlay through the TitleBarViewModel ctor callback. The remaining commands
+             are intentionally empty TitleBarViewModel placeholders; export / save /
              clipboard land later. -->
         <Menu Grid.Column="2"
               Margin="12,0,0,0"
@@ -252,6 +283,21 @@
                    FontWeight="Bold" />
 
         <StackPanel Grid.Column="4" Orientation="Horizontal">
+            <!-- Settings (gear) button. Flicksy.Icons glyph (white-on-transparent, so it
+                 reads on the dark bar) rather than a Segoe caption glyph; opens the editor
+                 Settings overlay. Uses the menu-style chip hover (TitleBarChipButtonStyle)
+                 so it reads as a peer of the File/Edit menu rather than the Min/Max/Close
+                 caption buttons; sits immediately left of Minimize. -->
+            <Button Style="{StaticResource TitleBarChipButtonStyle}"
+                    Margin="0,0,4,0"
+                    Command="{Binding SettingsCommand}"
+                    ToolTip="Settings">
+                <Image Source="{Binding SettingsIcon}"
+                       Width="16"
+                       Height="16"
+                       Stretch="Uniform"
+                       Opacity="0.85" />
+            </Button>
             <Button Style="{StaticResource CaptionButtonStyle}"
                     Content="&#xE921;"
                     ToolTip="Minimize"
