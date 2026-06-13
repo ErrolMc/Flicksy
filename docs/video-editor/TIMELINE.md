@@ -8,7 +8,7 @@ Visual map of the timeline region (issue #7). For the canonical per-control desc
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ TimelineView  ◀── 2×2 grid; pinned headers in column 0 stay put on H scroll  │
 │ ┌────────────┬───────────────────────────────────────────────────────────┐ ░ │
-│ │  spacer    │  TimeRulerView   (RulerScroller — H-slaved to Main)      │ ░ │
+│ │  +Track    │  TimeRulerView   (RulerScroller — H-slaved to Main)      │ ░ │
 │ │  120×24    │  00:00   00:02   00:04   00:06   00:08   00:10   00:12   │ ░ │
 │ ├────────────┼───────────────────────────────────────────────────────────┤───│
 │ │TrackHeader │  ┌── ClipView ──┐          ┌── ClipView ──┐               │ ▒ │
@@ -41,7 +41,8 @@ TimelineView (UserControl)                          Controls/TimelineView.xaml
    │       walks up from OriginalSource to find a ClipView; if none, deselect)
    │
    └─ Grid  (2 columns × 2 rows)
-      ├─ (0,0)  Border  ←── corner spacer (120×24, dark fill)
+      ├─ (0,0)  Border  ←── corner cell (120×24): hosts the Add-track dropdown
+      │            • dark-styled Menu; Video/Overlay/Audio → TimelineViewModel.AddTrackCommand
       │
       ├─ (0,1)  ScrollViewer "RulerScroller"
       │         H scrollbar hidden, V disabled; H offset slaved to MainScroller

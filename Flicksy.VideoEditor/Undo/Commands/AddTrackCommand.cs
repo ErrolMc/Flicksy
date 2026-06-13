@@ -6,11 +6,13 @@ using System.Collections.ObjectModel;
 namespace Flicksy.VideoEditor.Undo.Commands;
 
 /// <summary>
-/// Adds one <see cref="Track"/> to the project's track list — currently the audio track spun up by
+/// Adds one <see cref="Track"/> to the project's track list — pushed by the corner Add-track button
+/// (<see cref="TimelineViewModel.AddTrack"/>) and by the audio track spun up by
 /// <see cref="TimelineViewModel.DetachAudio"/>. Deliberately granular: detach bundles this with a
 /// separate <see cref="AddClipCommand"/> (the audio clip) and a <see cref="ChangeClipStreamsCommand"/>
 /// (the source clip's stream flip) inside one <c>CompositeCommand</c>, so a future "detach onto an
-/// existing audio track" can drop just this command and reuse the other two.
+/// existing audio track" can drop just this command and reuse the other two. Its inverse (delete a
+/// track) is <see cref="RemoveTrackCommand"/>.
 /// <para>
 /// The track is already in <see cref="Project.Project.Tracks"/> when this is pushed (the edit mutated
 /// live), matching the "push after mutation" convention — <see cref="Redo"/> runs only when stepping

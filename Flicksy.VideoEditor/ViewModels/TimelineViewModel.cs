@@ -736,6 +736,88 @@ public partial class TimelineViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Adds a new empty <see cref="Track"/> of <paramref name="kind"/> to the project as one undoable
+    /// edit — the corner Add-track button's model entry. The track is named by <see cref="NextTrackName"/>
+    /// and inserted by <see cref="ResolveInsertIndex"/> so it lands at the bottom of its kind's group
+    /// (tracks stay ordered Video → Overlay → Audio, matching the timeline UI and the compositor's
+    /// z-grouping). Selection is untouched — tracks aren't selectable, only clips are.
+    /// </summary>
+    [RelayCommand]
+    private void AddTrack(TrackKind kind)
+    {
+        var track = new Track { Kind = kind, Name = NextTrackName(kind) };
+        int index = ResolveInsertIndex(kind);
+        Project.Tracks.Insert(index, track);
+        History.Push(new AddTrackCommand(this, track, index));
+    }
+
+    /// <summary>
+    /// Removes <paramref name="track"/> from the project as one undoable edit — the model entry for the
+    /// track header's "Delete track" command (the View owns the confirm-if-non-empty prompt, so this
+    /// stays headless-testable). Any selected clip living on the track is dropped from the selection
+    /// first so the right rail / inspector don't dangle on a clip that's no longer in the document. The
+    /// removed <see cref="Track"/> instance keeps its clips while detached, so the pushed
+    /// <see cref="RemoveTrackCommand"/> restores them on undo by re-inserting the same instance. No-op
+    /// when the track isn't in the project. Allowed on locked / last tracks alike (a locked track guards
+    /// its clips' edits, not the track itself; an empty timeline is recoverable via Add track).
+    /// </summary>
+    public void RemoveTrack(Track track)
+    {
+        int index = Project.Tracks.IndexOf(track);
+        if (index < 0)
+            return;
+
+        List<Clip> remaining = SelectedClips.Where(c => !track.Clips.Contains(c)).ToList();
+        if (remaining.Count != SelectedClips.Count)
+            SetSelection(remaining);
+
+        Project.Tracks.Remove(track);
+        History.Push(new RemoveTrackCommand(this, track, index));
+    }
+
+    // The index a new track of `kind` is inserted at to keep tracks grouped Video → Overlay → Audio
+    // (the order TrackKind is declared in, which matches the timeline's top-to-bottom layout and the
+    // compositor's z-grouping). Insert just before the first existing track of a higher kind, so a new
+    // track lands at the bottom of its own kind's contiguous group; appended at the end when none are
+    // higher (e.g. a new Audio track).
+    private int ResolveInsertIndex(TrackKind kind)
+    {
+        for (int i = 0; i < Project.Tracks.Count; i++)
+        {
+            if ((int)Project.Tracks[i].Kind > (int)kind)
+                return i;
+        }
+        return Project.Tracks.Count;
+    }
+
+    // First track name of `kind` not already taken. Video is always numbered from 1 ("Video 1",
+    // "Video 2", …) to match CreateEmpty's defaults; Overlay / Audio use the bare base name first
+    // ("Overlay", "Audio") then number from 2 (so a freshly-added Audio track on a project that has
+    // none is just "Audio", a second is "Audio 2" — mirroring DetachAudio's piling). DetachAudio keeps
+    // its own start-at-2 loop deliberately (it never reuses the bare default).
+    private string NextTrackName(TrackKind kind)
+    {
+        string baseName = kind switch
+        {
+            TrackKind.Video => "Video",
+            TrackKind.Overlay => "Overlay",
+            TrackKind.Audio => "Audio",
+            _ => "Track",
+        };
+
+        bool Taken(string name) => Project.Tracks.Any(t => string.Equals(t.Name, name, StringComparison.Ordinal));
+
+        if (kind != TrackKind.Video && !Taken(baseName))
+            return baseName;
+
+        int n = kind == TrackKind.Video ? 1 : 2;
+        while (Taken($"{baseName} {n}"))
+            n++;
+
+        return $"{baseName} {n}";
+    }
+
+    /// <summary>
     /// Splits <paramref name="clip"/> at <paramref name="frame"/> — the razor's cut-at-click entry
     /// (<c>RazorTool</c> calls this). No-op unless the frame is strictly inside the clip on an
     /// unlocked track. Pushes a single <c>SplitClipCommand</c> and selects the left half (the original).

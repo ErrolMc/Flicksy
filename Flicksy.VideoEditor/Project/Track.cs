@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Flicksy.VideoEditor.Project;
@@ -32,6 +33,17 @@ public partial class Track : ObservableObject
     /// <summary>Compositor skips the track entirely; the row ghosts in the timeline UI.</summary>
     [ObservableProperty]
     private bool disabled;
+
+    // Inline-rename buffer for the track-header name. Flipped true by BeginRename; TrackHeaderView
+    // swaps the name TextBlock for a TextBox bound to EditingName. Transient — not serialized; the
+    // persisted state is just Name.
+    [JsonIgnore]
+    [ObservableProperty]
+    private bool isEditing;
+
+    [JsonIgnore]
+    [ObservableProperty]
+    private string editingName = string.Empty;
 
     public ObservableCollection<Clip> Clips { get; } = new();
 
@@ -87,5 +99,44 @@ public partial class Track : ObservableObject
     {
         Transitions.Clear();
         Transitions.AddRange(snapshot);
+    }
+
+    /// <summary>
+    /// Opens the inline-rename TextBox on this track's header, seeding the buffer with the current
+    /// <see cref="Name"/>. Idempotent — calling it while already editing just re-seeds.
+    /// </summary>
+    public void BeginRename()
+    {
+        EditingName = Name;
+        IsEditing = true;
+    }
+
+    /// <summary>
+    /// Closes the rename editor and writes the trimmed buffer to <see cref="Name"/>. Empty /
+    /// whitespace input is treated as a cancel — a track always keeps a non-empty name (there's no
+    /// auto-derived fallback as on <see cref="MediaClip"/>). The <c>!IsEditing</c> early return guards
+    /// the LostFocus-after-Enter double-fire (Enter commits and collapses the TextBox, whose collapse
+    /// raises LostFocus and re-enters here).
+    /// </summary>
+    public void CommitRename()
+    {
+        if (!IsEditing)
+            return;
+
+        string trimmed = (EditingName ?? string.Empty).Trim();
+        if (!string.IsNullOrEmpty(trimmed))
+            Name = trimmed;
+
+        IsEditing = false;
+        EditingName = string.Empty;
+    }
+
+    /// <summary>
+    /// Closes the rename editor without writing the buffer.
+    /// </summary>
+    public void CancelRename()
+    {
+        IsEditing = false;
+        EditingName = string.Empty;
     }
 }

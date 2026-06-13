@@ -5,6 +5,7 @@
              Width="120"
              Height="56">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <SolidColorBrush x:Key="HeaderBorderBrush" Color="#2A2A2A" />
         <SolidColorBrush x:Key="HeaderTextBrush" Color="#E0E0E0" />
         <SolidColorBrush x:Key="HeaderMutedBrush" Color="#888888" />
@@ -61,6 +62,17 @@
     <Border BorderBrush="{StaticResource HeaderBorderBrush}"
             BorderThickness="0,0,1,1"
             Padding="8,4">
+        <Border.ContextMenu>
+            <!-- Rename opens the inline TextBox (Track.BeginRename); also reachable by double-clicking
+                 the name. Delete track's confirm-if-non-empty prompt + VM routing live in code-behind
+                 (OnDeleteTrackClick) so TimelineViewModel.RemoveTrack stays a pure, testable mutation.
+                 Allowed on locked tracks per the feature's decision. -->
+            <ContextMenu>
+                <MenuItem Header="Rename" Click="OnRenameClick" />
+                <Separator />
+                <MenuItem Header="Delete track" Click="OnDeleteTrackClick" />
+            </ContextMenu>
+        </Border.ContextMenu>
         <Border.Style>
             <Style TargetType="Border">
                 <Style.Triggers>
@@ -76,13 +88,37 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <!-- Name display + inline-rename TextBox (swap on IsEditing, mirroring ClipView).
+                 Double-click the name to rename; the context-menu Rename item does the same. -->
             <TextBlock Grid.Row="0"
                        Text="{Binding Name}"
+                       Background="Transparent"
                        Foreground="{StaticResource HeaderTextBrush}"
                        FontSize="12"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis" />
+                       TextTrimming="CharacterEllipsis"
+                       MouseLeftButtonDown="OnNameMouseLeftButtonDown">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBox Grid.Row="0"
+                     Text="{Binding EditingName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Padding="1,0"
+                     Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                     IsVisibleChanged="OnRenameTextBoxVisibleChanged"
+                     KeyDown="OnRenameTextBoxKeyDown"
+                     LostFocus="OnRenameTextBoxLostFocus" />
 
             <StackPanel Grid.Row="1"
                         Orientation="Horizontal"
