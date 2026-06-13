@@ -74,7 +74,7 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         _compositor = compositor;
 
         Transport = new TransportViewModel(project);
-        Preview = new PreviewViewModel(project, Transport, compositor);
+        Preview = new PreviewViewModel(project, Transport, compositor, settings.Current);
         // Share the one UndoManager with the timeline and the title bar's Edit menu so gesture
         // tools and menu Undo/Redo push to / read from the same stack.
         Timeline = new TimelineViewModel(project, Transport, history);

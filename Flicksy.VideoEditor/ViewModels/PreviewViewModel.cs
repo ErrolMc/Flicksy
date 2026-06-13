@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Flicksy.VideoEditor.Composition;
 using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
+using Flicksy.VideoEditor.Services;
 
 namespace Flicksy.VideoEditor.ViewModels;
 
@@ -35,6 +36,9 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
     private readonly Project.Project _project;
     private readonly TransportViewModel _transport;
     private readonly ICompositor _compositor;
+
+    // Times one compositor paint (UI thread) so PerformanceStats can report frame cost + FPS.
+    private readonly System.Diagnostics.Stopwatch _compositeTimer = new();
 
     // Off-thread, coalesced scrubbing: a paused ruler/timeline seek decodes on a background thread
     // (~120 ms random-access seek) instead of blocking the UI; the worker calls PresentScrubFrame
@@ -111,12 +115,13 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
         }
     }
 
-    public PreviewViewModel(Project.Project project, TransportViewModel transport, ICompositor compositor)
+    public PreviewViewModel(Project.Project project, TransportViewModel transport, ICompositor compositor, VideoEditorSettings settings)
     {
         _project = project;
         _transport = transport;
         _compositor = compositor;
         ProjectSettings = project.Settings;
+        PerformanceStats = new PerformanceStatsViewModel(settings);
 
         _transport.PropertyChanged += OnTransportPropertyChanged;
         _project.Settings.PropertyChanged += OnSettingsPropertyChanged;
@@ -131,6 +136,9 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
     }
 
     public ProjectSettings ProjectSettings { get; }
+
+    /// <summary>Backs the preview performance HUD; fed timing from <see cref="Render"/> on each composite.</summary>
+    public PerformanceStatsViewModel PerformanceStats { get; }
 
     /// <summary>Options for the preview-quality dropdown, full fidelity first.</summary>
     public IReadOnlyList<PreviewQualityOption> QualityOptions { get; } = new[]
@@ -180,11 +188,15 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
                 // The decode scale matches what the compositor derives internally (target/project).
                 double decodeScale = (double)target.PixelWidth / ProjectSettings.ResolutionWidth;
                 if (!frames.BeginFrame(frame, decodeScale))
-                    return; // miss → keep the previous frame
+                {
+                    // Miss → keep the previous frame; record it so the HUD shows the decode shortfall.
+                    PerformanceStats.RecordDroppedFrame();
+                    return;
+                }
 
                 try
                 {
-                    _compositor.RenderFrame(_project, frame, target, frames, frames.CurrentLayers);
+                    TimedRenderFrame(frame, target, frames, frames.CurrentLayers);
                 }
                 finally
                 {
@@ -205,7 +217,7 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
                 // synchronous decode on the UI thread (the canonical path). Not a drag, so the
                 // on-thread decode is acceptable, and it keeps CurrentFrame painted synchronously at
                 // construction.
-                _compositor.RenderFrame(_project, frame, target);
+                TimedRenderFrame(frame, target);
             }
         }
         catch (Exception ex)
@@ -240,12 +252,26 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
             // the native source extent, so a bundle decoded at a now-stale scale still composites
             // correctly, just at that fidelity for one frame.
             var provider = new BundleFrameProvider(bundle);
-            _compositor.RenderFrame(_project, bundle.Frame, target, provider, bundle.Layers);
+            TimedRenderFrame(bundle.Frame, target, provider, bundle.Layers);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"PreviewViewModel.PresentScrubFrame failed: {ex}");
         }
+    }
+
+    /// <summary>
+    /// Paint one frame through the compositor, timing the call so <see cref="PerformanceStats"/> can
+    /// report frame cost + FPS. <paramref name="frames"/> / <paramref name="layers"/> are omitted on
+    /// the synchronous path (the compositor then plans + decodes the frame itself).
+    /// </summary>
+    private void TimedRenderFrame(int frame, WriteableBitmap target,
+        IClipFrameProvider? frames = null, IReadOnlyList<CompositionLayer>? layers = null)
+    {
+        _compositeTimer.Restart();
+        _compositor.RenderFrame(_project, frame, target, frames, layers);
+        _compositeTimer.Stop();
+        PerformanceStats.RecordComposite(_compositeTimer.Elapsed.TotalMilliseconds);
     }
 
     public void Dispose()
@@ -261,6 +287,7 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
         // Joins the scrub worker before tearing down its decoder cache. _disposed is set first, so a
         // present callback already queued on the dispatcher no-ops instead of touching the compositor.
         _scrub.Dispose();
+        PerformanceStats.Dispose();
     }
 
     /// <summary>
@@ -299,6 +326,8 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
 
         _target = new WriteableBitmap(w, h, 96, 96, PixelFormats.Pbgra32, null);
         CurrentFrame = _target;
+        string qualityLabel = QualityOptions.First(o => o.Quality == SelectedQuality).Label;
+        PerformanceStats.SetResolution(w, h, qualityLabel);
         return _target;
     }
 }

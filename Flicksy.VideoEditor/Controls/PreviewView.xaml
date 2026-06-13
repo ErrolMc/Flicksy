@@ -1,6 +1,7 @@
 <UserControl x:Class="Flicksy.VideoEditor.Controls.PreviewView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Flicksy.VideoEditor.Controls"
              Background="#0A0A0A">
     <UserControl.Resources>
         <!-- Dark, compact ComboBox for the preview-quality selector (first ComboBox in the app).
@@ -110,6 +111,13 @@
                HorizontalAlignment="Stretch"
                VerticalAlignment="Stretch"
                SnapsToDevicePixels="True" />
+
+        <!-- Performance stats HUD (top-left). Gated by VideoEditorSettings.ShowPerformanceStats via
+             PreviewViewModel.PerformanceStats. -->
+        <controls:PerformanceStatsView DataContext="{Binding PerformanceStats}"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top"
+                                       Margin="10,10,0,0" />
 
         <!-- Preview-quality selector. View-only proxy setting (ADR 0008) — never affects export. -->
         <Border HorizontalAlignment="Right"
