@@ -3,9 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using Flicksy.Drawing.Media;
-using Flicksy.VideoEditor.ViewModels;
+using Flicksy.VideoEditor.Services;
 using Flicksy.VideoEditor.Windows;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -16,10 +15,6 @@ public partial class App : Application
     private const string NewVideoProjectArgName = "--new-video-project";
 
     private IHost? _host;
-
-    public static IServiceProvider Services =>
-        ((App)Current)._host?.Services
-            ?? throw new InvalidOperationException("Host has not been initialized.");
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -41,12 +36,11 @@ public partial class App : Application
         }
 
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-        // Factory registrations: a fresh empty Project per resolve, propagated up
-        // through the VM into the window. EditorWithSource bypasses DI and uses
-        // Project.CreateFromSourceFile() directly so the source path can flow in.
-        builder.Services.AddTransient(_ => Project.Project.CreateEmpty());
-        builder.Services.AddTransient<VideoEditorViewModel>();
-        builder.Services.AddTransient<VideoEditorWindow>();
+        // Services + IEditorFactory, which builds the editor window around a runtime-chosen
+        // Project. The editor is never resolved directly — the factory owns its construction so
+        // empty / from-source / (future) from-saved all flow through one DI-built path; only the
+        // argless Welcome window is resolved straight from the container.
+        builder.Services.AddVideoEditorServices();
         builder.Services.AddTransient<WelcomeWindow>();
         _host = builder.Build();
         _host.Start();
@@ -54,16 +48,15 @@ public partial class App : Application
         // Read-once kill switch (ADR 0010), pushed into the Drawing library because the library
         // itself reads no configuration. Must be set before the first preview render constructs
         // a decoder — EditorWithSource composites during window construction below.
-        IConfiguration configuration = _host.Services.GetRequiredService<IConfiguration>();
-        HardwareMediaDecoder.Disabled =
-            bool.TryParse(configuration["DisableHardwareDecode"], out bool disableHwDecode) && disableHwDecode;
+        ISettingsService settings = _host.Services.GetRequiredService<ISettingsService>();
+        HardwareMediaDecoder.Disabled = settings.DisableHardwareDecode;
 
+        IEditorFactory editorFactory = _host.Services.GetRequiredService<IEditorFactory>();
         StartupMode mode = ResolveStartupMode(e.Args);
         Window window = mode switch
         {
-            StartupMode.EmptyEditor => _host.Services.GetRequiredService<VideoEditorWindow>(),
-            StartupMode.EditorWithSource src => new VideoEditorWindow(
-                new VideoEditorViewModel(Project.Project.CreateFromSourceFile(src.Path)), src.Path),
+            StartupMode.EmptyEditor => editorFactory.Create(new EditorRequest.Empty()),
+            StartupMode.EditorWithSource src => editorFactory.Create(new EditorRequest.FromSourceFile(src.Path)),
             _ => _host.Services.GetRequiredService<WelcomeWindow>(),
         };
 

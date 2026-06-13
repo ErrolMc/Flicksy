@@ -6,16 +6,10 @@
              xmlns:vm="clr-namespace:Flicksy.VideoEditor.ViewModels">
     <Application.Resources>
 
-        <!-- Shell-overlay content templates. Implicit (DataType, no x:Key) so the
-             OverlayHost's ContentPresenter resolves the active overlay VM to its tile
-             view app-wide. Add a DataTemplate here (plus the VM + tile view) per new
-             overlay — Project Settings, Settings, future Export. -->
-        <DataTemplate DataType="{x:Type vm:ProjectSettingsOverlayViewModel}">
-            <controls:ProjectSettingsOverlay />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:SettingsOverlayViewModel}">
-            <controls:SettingsOverlay />
-        </DataTemplate>
+        <!-- Overlay VM → tile-view resolution is handled by the convention ViewLocator on the
+             OverlayHost's ContentPresenter ({Name}ViewModel → {Name}View); no per-overlay
+             DataTemplate is needed here. -->
+
 
         <!-- App-wide dark scrollbars. Implicit style targets every ScrollBar in the app
              (timeline, panel lists, future scroll regions) so the chrome stays consistent

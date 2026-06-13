@@ -6,22 +6,27 @@ using Flicksy.Drawing.Undo;
 using Flicksy.VideoEditor.Composition;
 using Flicksy.VideoEditor.Playback;
 using Flicksy.VideoEditor.Project;
+using Flicksy.VideoEditor.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Flicksy.VideoEditor.ViewModels;
 
 /// <summary>
-/// Root view-model for the video editor shell. Owns the document <see cref="Project"/>
-/// plus the per-surface sub-VMs (<see cref="TitleBar"/>, <see cref="Preview"/>,
-/// <see cref="Transport"/>, <see cref="Timeline"/>, <see cref="Inspector"/>,
-/// <see cref="MediaBin"/>) and the shell UI state (selection, panel open/closed, rail tab). Owns the editor's <see cref="History"/>
-/// (one <see cref="UndoManager"/> per editor window, mirroring PostSnip's
-/// <c>DrawingViewModel.History</c>); the shell's <c>Ctrl+Z</c>/<c>Ctrl+Y</c> bindings invoke
-/// <c>History.UndoCommand</c>/<c>RedoCommand</c>. Timeline-edit commands push onto it as #12's
-/// gesture tools land.
+/// Root view-model for the video editor shell. Owns the document <see cref="Project"/> plus the
+/// per-surface sub-VMs (<see cref="TitleBar"/>, <see cref="Preview"/>, <see cref="Transport"/>,
+/// <see cref="Timeline"/>, <see cref="Inspector"/>, <see cref="MediaBin"/>) and the shell UI state
+/// (selection, panel open/closed, rail tab). The cross-cutting collaborators it threads into those
+/// sub-VMs — the shared <see cref="History"/> (<see cref="IUndoService"/>), the
+/// <see cref="OverlayHost"/> (<see cref="IOverlayService"/>), the <see cref="ICompositor"/> and
+/// <see cref="IProjectSettingsService"/> — are injected from the container; the per-document
+/// sub-VMs are composed here around the runtime <see cref="Project"/> (which the container does
+/// not hold). One document per process today — see the scope note in
+/// <see cref="Services.ServiceCollectionExtensions"/> for the tabs/MDI evolution.
 /// </summary>
 public partial class VideoEditorViewModel : ObservableObject, IDisposable
 {
     private readonly ICompositor _compositor;
+    private readonly bool _ownsCompositor;
     private readonly PlaybackEngine _playbackEngine;
     private bool _disposed;
 
@@ -44,21 +49,40 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isRightPanelOpen;
 
-    public VideoEditorViewModel(Project.Project project)
+    /// <summary>
+    /// DI constructor. The runtime <see cref="Project"/> is supplied by <see cref="IEditorFactory"/>
+    /// (positionally, via <see cref="ActivatorUtilities"/>); the cross-cutting collaborators come
+    /// from the container. The per-document sub-VMs are composed here so they all share the one
+    /// runtime project plus the injected <paramref name="history"/>/<paramref name="overlayHost"/>/
+    /// <paramref name="compositor"/>.
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public VideoEditorViewModel(
+        Project.Project project,
+        UndoManager history,
+        OverlayHostViewModel overlayHost,
+        ICompositor compositor,
+        IProjectSettingsService projectSettings)
     {
         Project = project;
-        // One compositor per editor window. Decoder cache + Skia state live for the
-        // lifetime of the project; Dispose tears them down when the window closes.
-        _compositor = new SkiaCompositor();
+        History = history;
+        OverlayHost = overlayHost;
+        // One compositor per editor window (decoder cache + Skia state). On the DI path the
+        // container owns it; the convenience ctor below flags _ownsCompositor so it disposes
+        // the one it created instead.
+        _compositor = compositor;
+
         Transport = new TransportViewModel(project);
-        Preview = new PreviewViewModel(project, Transport, _compositor);
-        // History is a property initializer (runs before this body) so it's non-null here;
-        // share the one UndoManager instance with the timeline and the title bar's Edit
-        // menu so gesture tools and menu Undo/Redo push to / read from the same stack.
-        Timeline = new TimelineViewModel(project, Transport, History);
+        Preview = new PreviewViewModel(project, Transport, compositor);
+        // Share the one UndoManager with the timeline and the title bar's Edit menu so gesture
+        // tools and menu Undo/Redo push to / read from the same stack.
+        Timeline = new TimelineViewModel(project, Transport, history);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
-        TitleBar = new TitleBarViewModel(History, OpenProjectSettings, OpenSettings);
+        // TitleBar opens overlays through the shared overlay host (as IOverlayService) and reads
+        // the document's settings through IProjectSettingsService — so it never needs a root-VM
+        // reference and its menu commands stay fully DI-constructible.
+        TitleBar = new TitleBarViewModel(history, overlayHost, projectSettings);
 
         // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
         // Transport (which Preview, Timeline and the ruler already observe). Attach after both
@@ -69,28 +93,26 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         Transport.AttachPlaybackController(_playbackEngine);
 
         // Timeline.SelectedClip is the user-facing write side (clip clicks); root's
-        // SelectedClip is what every other surface reads (right rail, inspectors).
-        // Sync both ways so a click in the timeline flows up and an external clear
-        // (or future programmatic select) flows back down.
+        // SelectedClip is what every other surface reads (right rail, inspectors). Sync both
+        // ways so a click in the timeline flows up and an external clear flows back down.
         Timeline.PropertyChanged += OnTimelinePropertyChanged;
+    }
 
-        LeftRailItems = new[]
-        {
-            new RailItem { Label = "Media", Glyph = "M", Tag = LeftRailTab.Media },
-            new RailItem { Label = "Text", Glyph = "T", Tag = LeftRailTab.Text },
-            new RailItem { Label = "Shapes", Glyph = "S", Tag = LeftRailTab.Shapes },
-            new RailItem { Label = "Pen", Glyph = "P", Tag = LeftRailTab.Pen },
-            new RailItem { Label = "Transitions", Glyph = "Tr", Tag = LeftRailTab.Transitions },
-        };
-
-        RightRailItems = new[]
-        {
-            new RailItem { Label = "Speed", Glyph = "Sp", Tag = RightRailTab.Speed },
-            new RailItem { Label = "Audio", Glyph = "Au", Tag = RightRailTab.Audio },
-            new RailItem { Label = "Adjust colors", Glyph = "Co", Tag = RightRailTab.AdjustColors },
-            new RailItem { Label = "Filters", Glyph = "Fi", Tag = RightRailTab.Filters },
-            new RailItem { Label = "Fade", Glyph = "Fa", Tag = RightRailTab.Fade },
-        };
+    /// <summary>
+    /// Convenience constructor for design-time and the window's fallback ctors: builds the
+    /// cross-cutting collaborators by hand (mirroring the DI registrations) and delegates to the
+    /// DI constructor. The compositor created here is owned by this VM and disposed in
+    /// <see cref="Dispose"/>; on the DI path the container owns it instead.
+    /// </summary>
+    public VideoEditorViewModel(Project.Project project)
+        : this(
+            project,
+            new UndoManager(),
+            new OverlayHostViewModel(),
+            new SkiaCompositor(),
+            new ProjectSettingsService { Current = project.Settings })
+    {
+        _ownsCompositor = true;
     }
 
     public Project.Project Project { get; }
@@ -107,23 +129,38 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     public MediaBinViewModel MediaBin { get; }
 
-    public IReadOnlyList<RailItem> LeftRailItems { get; }
+    public IReadOnlyList<RailItem> LeftRailItems { get; } = new[]
+    {
+        new RailItem { Label = "Media", Glyph = "M", Tag = LeftRailTab.Media },
+        new RailItem { Label = "Text", Glyph = "T", Tag = LeftRailTab.Text },
+        new RailItem { Label = "Shapes", Glyph = "S", Tag = LeftRailTab.Shapes },
+        new RailItem { Label = "Pen", Glyph = "P", Tag = LeftRailTab.Pen },
+        new RailItem { Label = "Transitions", Glyph = "Tr", Tag = LeftRailTab.Transitions },
+    };
 
-    public IReadOnlyList<RailItem> RightRailItems { get; }
+    public IReadOnlyList<RailItem> RightRailItems { get; } = new[]
+    {
+        new RailItem { Label = "Speed", Glyph = "Sp", Tag = RightRailTab.Speed },
+        new RailItem { Label = "Audio", Glyph = "Au", Tag = RightRailTab.Audio },
+        new RailItem { Label = "Adjust colors", Glyph = "Co", Tag = RightRailTab.AdjustColors },
+        new RailItem { Label = "Filters", Glyph = "Fi", Tag = RightRailTab.Filters },
+        new RailItem { Label = "Fade", Glyph = "Fa", Tag = RightRailTab.Fade },
+    };
 
     /// <summary>
-    /// The editor's undo stack. Timeline-edit gestures (#12) push before/after-snapshot
-    /// commands here; Ctrl+Z/Ctrl+Y bind to its <see cref="UndoManager.UndoCommand"/> /
-    /// <see cref="UndoManager.RedoCommand"/>.
+    /// The editor's undo stack (injected; one <see cref="UndoManager"/> per editor window).
+    /// Timeline-edit gestures (#12) push before/after-snapshot commands here; Ctrl+Z/Ctrl+Y
+    /// bind to its <see cref="UndoManager.UndoCommand"/> / <see cref="UndoManager.RedoCommand"/>.
     /// </summary>
-    public UndoManager History { get; } = new();
+    public UndoManager History { get; }
 
     /// <summary>
-    /// The shell's modal overlay layer (Project Settings / Settings / future Export).
-    /// <see cref="Controls.OverlayHost"/> binds this; the window's key handling
-    /// light-dismisses on Esc and gates editor shortcuts while an overlay is open.
+    /// The shell's modal overlay layer (Project Settings / Settings / future Export), injected as
+    /// the shared <see cref="IOverlayService"/> implementation. <see cref="Controls.OverlayHost"/>
+    /// binds this; the window's key handling light-dismisses on Esc and gates editor shortcuts
+    /// while an overlay is open.
     /// </summary>
-    public OverlayHostViewModel OverlayHost { get; } = new();
+    public OverlayHostViewModel OverlayHost { get; }
 
     partial void OnSelectedClipChanged(Clip? value)
     {
@@ -141,26 +178,6 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>
-    /// Opens the Project Settings overlay. Passed into <see cref="TitleBarViewModel"/>
-    /// as the File menu's Project Settings handler so the title bar VM never needs a
-    /// root-VM reference. No <c>onClosed</c> — nothing reacts to dismissal yet.
-    /// </summary>
-    public void OpenProjectSettings()
-    {
-        OverlayHost.Show(new ProjectSettingsOverlayViewModel(Project.Settings, OverlayHost.Close));
-    }
-
-    /// <summary>
-    /// Opens the editor Settings overlay (the title bar's gear button). The panel is a
-    /// placeholder shell for now — its single option is a no-op — so no <c>onClosed</c>
-    /// is needed.
-    /// </summary>
-    public void OpenSettings()
-    {
-        OverlayHost.Show(new SettingsOverlayViewModel(OverlayHost.Close));
-    }
-
     public void Dispose()
     {
         if (_disposed)
@@ -173,6 +190,11 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         // Preview next: joins its background scrub worker before the shared compositor (which the
         // worker's present path uses) is torn down.
         Preview.Dispose();
-        _compositor.Dispose();
+        // Dispose the compositor only when this VM created it (design-time/fallback path); on the
+        // DI path the container owns the singleton and disposes it at host shutdown.
+        if (_ownsCompositor)
+        {
+            _compositor.Dispose();
+        }
     }
 }

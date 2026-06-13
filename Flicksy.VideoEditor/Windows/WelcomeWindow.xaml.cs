@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using Microsoft.Extensions.DependencyInjection;
+using Flicksy.VideoEditor.Services;
 
 namespace Flicksy.VideoEditor.Windows;
 
@@ -14,9 +14,12 @@ public partial class WelcomeWindow : Window
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
-    public WelcomeWindow()
+    private readonly IEditorFactory _editorFactory;
+
+    public WelcomeWindow(IEditorFactory editorFactory)
     {
         InitializeComponent();
+        _editorFactory = editorFactory;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -36,7 +39,7 @@ public partial class WelcomeWindow : Window
 
     private void OnNewVideoProjectClicked(object sender, RoutedEventArgs e)
     {
-        var editor = App.Services.GetRequiredService<VideoEditorWindow>();
+        VideoEditorWindow editor = _editorFactory.Create(new EditorRequest.Empty());
 
         // Hand window ownership to the editor so closing Welcome doesn't terminate the
         // app (App.ShutdownMode default is OnMainWindowClose).

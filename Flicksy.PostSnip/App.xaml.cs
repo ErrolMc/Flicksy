@@ -6,8 +6,8 @@ using System.Windows;
 using System.Windows.Threading;
 using Flicksy.Drawing.Media;
 using Flicksy.Drawing.ViewModels;
+using Flicksy.PostSnip.Services;
 using Flicksy.PostSnip.ViewModels;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -39,6 +39,7 @@ public partial class App : Application
         }
 
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+        builder.Services.AddPostSnipServices();
         builder.Services.AddTransient<IVideoPlayer, FFmpegVideoPlayer>();
         builder.Services.AddTransient<ImageEditToolsViewModel>();
         builder.Services.AddTransient<DrawingViewModel>();
@@ -50,8 +51,8 @@ public partial class App : Application
         _host.Start();
 
         var window = _host.Services.GetRequiredService<PostSnipWindow>();
-        var configuration = _host.Services.GetRequiredService<IConfiguration>();
-        string? mediaPath = ResolveStartupMediaPath(e.Args, configuration);
+        ISettingsService settings = _host.Services.GetRequiredService<ISettingsService>();
+        string? mediaPath = ResolveStartupMediaPath(e.Args, settings.LaunchPostSnipWithFilePath);
 
         MainWindow = window;
         window.Show();
@@ -108,7 +109,7 @@ public partial class App : Application
         return extension is ".mp4" or ".mov" or ".avi" or ".wmv" or ".mkv";
     }
 
-    private static string? ResolveStartupMediaPath(string[] args, IConfiguration configuration)
+    private static string? ResolveStartupMediaPath(string[] args, string? launchFilePathSetting)
     {
         string? argumentPath = GetLaunchFilePathFromArguments(args) ?? args.FirstOrDefault();
         if (TryValidatePath(argumentPath, out var validatedFromArgs))
@@ -116,7 +117,7 @@ public partial class App : Application
             return validatedFromArgs;
         }
 
-        return TryValidatePath(configuration["LaunchPostSnipWithFilePath"], out var validatedFromSettings)
+        return TryValidatePath(launchFilePathSetting, out var validatedFromSettings)
             ? validatedFromSettings
             : null;
     }

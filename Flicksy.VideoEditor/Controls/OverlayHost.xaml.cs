@@ -8,9 +8,10 @@ namespace Flicksy.VideoEditor.Controls;
 /// The shell's modal overlay layer: a window-wide dim backdrop with the active overlay's
 /// tile centered on top. <c>DataContext</c> is the root VM's <see cref="OverlayHostViewModel"/>
 /// (rebound in VideoEditorWindow.xaml); the <c>ContentPresenter</c> templates
-/// <see cref="OverlayHostViewModel.CurrentOverlay"/> into a tile via the implicit
-/// <c>DataTemplate</c>s in this control's resources. Esc handling lives in the window's
-/// modal gate (<c>OnPreviewKeyDown</c>), not here — this control never holds focus.
+/// <see cref="OverlayHostViewModel.CurrentOverlay"/> into a tile via the convention
+/// <see cref="Flicksy.Drawing.Controls.ViewLocator"/> (<c>{Name}ViewModel</c> →
+/// <c>{Name}View</c>). Esc handling lives in the window's modal gate
+/// (<c>OnPreviewKeyDown</c>), not here — this control never holds focus.
 /// </summary>
 public partial class OverlayHost : UserControl
 {

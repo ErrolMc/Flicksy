@@ -1,14 +1,15 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Flicksy.VideoEditor.Services;
 
 namespace Flicksy.VideoEditor.ViewModels;
 
 /// <summary>
 /// The shell's modal overlay layer — a reusable host for one centered tile at a time
-/// (Project Settings, Settings, future Export). Plain bindable VM, not a DI service:
-/// the root <see cref="VideoEditorViewModel"/> owns one and drives it via
-/// <see cref="Show"/>/<see cref="Close"/>; <see cref="Controls.OverlayHost"/> binds
-/// <see cref="CurrentOverlay"/> and templates it into the matching tile view.
+/// (Project Settings, Settings, future Export). The bindable implementation of
+/// <see cref="Services.IOverlayService"/>: <see cref="Controls.OverlayHost"/> binds
+/// <see cref="CurrentOverlay"/> and templates it into the matching tile view, and any VM
+/// can open an overlay through the service via <see cref="Show"/>/<see cref="Close"/>.
 ///
 /// One overlay at a time: <see cref="Show"/> over an open overlay replaces it (the
 /// outgoing overlay's callback fires first). <c>onClosed</c> fires exactly once, on
@@ -18,7 +19,7 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// overlays that must not be casually dismissed (e.g. a running export); explicit
 /// <see cref="Close"/> still works. UI-thread only, like the rest of the shell state.
 /// </summary>
-public partial class OverlayHostViewModel : ObservableObject
+public partial class OverlayHostViewModel : ObservableObject, IOverlayService
 {
     private Action? _onClosed;
     private bool _allowLightDismiss;

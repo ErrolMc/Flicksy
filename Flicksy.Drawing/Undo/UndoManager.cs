@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Flicksy.Drawing.Undo;
 
-public partial class UndoManager : ObservableObject
+public partial class UndoManager : ObservableObject, IUndoService
 {
     private const int MaxEntries = 100;
 
