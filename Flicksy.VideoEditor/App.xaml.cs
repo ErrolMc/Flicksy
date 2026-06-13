@@ -45,11 +45,12 @@ public partial class App : Application
         _host = builder.Build();
         _host.Start();
 
-        // Read-once kill switch (ADR 0010), pushed into the Drawing library because the library
-        // itself reads no configuration. Must be set before the first preview render constructs
-        // a decoder — EditorWithSource composites during window construction below.
+        // Decode preference is applied once at startup (the ADR 0010 kill switch is set-once) and
+        // pushed into the Drawing library, which reads no settings itself. Must be set before the
+        // first preview render constructs a decoder — EditorWithSource composites during window
+        // construction below. Changing it in Settings takes effect on the next launch.
         ISettingsService settings = _host.Services.GetRequiredService<ISettingsService>();
-        HardwareMediaDecoder.Disabled = settings.DisableHardwareDecode;
+        HardwareMediaDecoder.Disabled = !settings.Current.UseHardwareDecode;
 
         IEditorFactory editorFactory = _host.Services.GetRequiredService<IEditorFactory>();
         StartupMode mode = ResolveStartupMode(e.Args);

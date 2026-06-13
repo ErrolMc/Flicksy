@@ -33,6 +33,10 @@ _Avoid_: "movie", "composition", "sequence".
 Mutable project-level settings: `Framerate`, `Resolution` (the canonical composite canvas), `AudioSampleRate`. `Resolution` can be changed mid-project.
 _Avoid_: "project config".
 
+**Editor settings (user preferences)**:
+App-wide, user-editable preferences that persist across sessions and across projects (e.g. "show performance stats", GPU vs CPU decode). Distinct from `ProjectSettings`: editor settings are the same regardless of which `Project` is open, and live outside the document. Surfaced in the Settings shell-overlay tile (the gear), separate from the Project Settings tile.
+_Avoid_: conflating with `ProjectSettings` (those are per-document); "options", "config".
+
 **Track**:
 An ordered horizontal lane on the timeline that contains `Clip`s. Has a `TrackKind` (`Video` / `Audio` / `Overlay`) used by the UI to constrain which clips can be dropped. The compositor does not branch on `TrackKind` — it branches on clip type. Carries three flags — `Muted`, `Locked`, `Disabled` — defined below.
 _Avoid_: "layer", "row", "channel".

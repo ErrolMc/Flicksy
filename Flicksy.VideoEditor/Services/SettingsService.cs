@@ -1,19 +1,29 @@
-using Microsoft.Extensions.Configuration;
+using Flicksy.Drawing.Settings;
 
 namespace Flicksy.VideoEditor.Services;
 
 /// <summary>
-/// <see cref="ISettingsService"/> backed by the host's <see cref="IConfiguration"/>
-/// (appsettings.json). Values are read once in the constructor, keeping the repo's
-/// no-live-config convention (settings don't change after startup).
+/// <see cref="ISettingsService"/> backed by a JSON file under <c>%LOCALAPPDATA%\Flicksy\</c>
+/// (via <see cref="UserSettingsStore"/>). <see cref="Current"/> is loaded once at construction;
+/// every property change on it is written straight back through, so the file always reflects
+/// the latest choice. Behavioural settings (e.g. decode mode) are still *applied* at startup —
+/// persisting live doesn't mean hot-reloading.
 /// </summary>
 internal sealed class SettingsService : ISettingsService
 {
-    public SettingsService(IConfiguration configuration)
-    {
-        DisableHardwareDecode =
-            bool.TryParse(configuration["DisableHardwareDecode"], out bool disable) && disable;
-    }
+    private const string FileName = "video-editor.json";
 
-    public bool DisableHardwareDecode { get; }
+    public VideoEditorSettings Current { get; }
+
+    public bool HardwareDecodeAppliedAtStartup { get; }
+
+    public SettingsService()
+    {
+        Current = UserSettingsStore.Load<VideoEditorSettings>(FileName);
+        // Snapshot the decode mode the app boots with (App.OnStartup pushes exactly this into the
+        // decoder), so the Settings overlay knows when a change still needs a restart to apply.
+        HardwareDecodeAppliedAtStartup = Current.UseHardwareDecode;
+        // Subscribe after load so deserialization populating the object can't trigger a save.
+        Current.PropertyChanged += (_, _) => UserSettingsStore.Save(FileName, Current);
+    }
 }

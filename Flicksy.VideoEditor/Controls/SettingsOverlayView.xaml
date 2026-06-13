@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Loaded="OnLoaded">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <SolidColorBrush x:Key="TileBackgroundBrush" Color="#242424" />
         <SolidColorBrush x:Key="TileBorderBrush" Color="#55FFFFFF" />
         <SolidColorBrush x:Key="SettingValueBrush" Color="#DDDDDD" />
@@ -86,9 +87,10 @@
     </UserControl.Resources>
 
     <!-- Tile only — OverlayHost owns the dim backdrop, centering, and light-dismiss.
-         DataContext is a SettingsOverlayViewModel (templated by OverlayHost). The
-         performance-stats checkbox is a no-op placeholder bound to the VM's own flag;
-         it drives nothing yet. -->
+         DataContext is a SettingsOverlayViewModel (templated by OverlayHost). Perf-stats binds
+         the app-wide VideoEditorSettings (VM.Settings, persisted by the service); decode binds the
+         VM.UseHardwareDecode proxy so a change can drive the restart warning, which stays visible
+         until the selection matches the mode the app booted with (decode applies next launch). -->
     <Border Width="380"
             Background="{StaticResource TileBackgroundBrush}"
             BorderBrush="{StaticResource TileBorderBrush}"
@@ -105,7 +107,18 @@
 
             <CheckBox Content="Show performance stats"
                       Style="{StaticResource DarkCheckBoxStyle}"
-                      IsChecked="{Binding ShowPerformanceStats, Mode=TwoWay}" />
+                      IsChecked="{Binding Settings.ShowPerformanceStats, Mode=TwoWay}" />
+
+            <CheckBox Content="Use GPU (hardware) video decoding"
+                      Margin="0,12,0,0"
+                      Style="{StaticResource DarkCheckBoxStyle}"
+                      IsChecked="{Binding UseHardwareDecode, Mode=TwoWay}" />
+            <TextBlock Text="Restart required to apply the new decode mode."
+                       Foreground="#E0A33E"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Margin="24,4,0,0"
+                       Visibility="{Binding DecodeRestartRequired, Converter={StaticResource BoolToVis}}" />
 
             <Rectangle Height="1" Fill="#33FFFFFF" Margin="0,12,0,12" />
 

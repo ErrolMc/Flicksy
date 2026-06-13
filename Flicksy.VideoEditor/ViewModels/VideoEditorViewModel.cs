@@ -17,8 +17,8 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// <see cref="Timeline"/>, <see cref="Inspector"/>, <see cref="MediaBin"/>) and the shell UI state
 /// (selection, panel open/closed, rail tab). The cross-cutting collaborators it threads into those
 /// sub-VMs — the shared <see cref="History"/> (<see cref="IUndoService"/>), the
-/// <see cref="OverlayHost"/> (<see cref="IOverlayService"/>), the <see cref="ICompositor"/> and
-/// <see cref="IProjectSettingsService"/> — are injected from the container; the per-document
+/// <see cref="OverlayHost"/> (<see cref="IOverlayService"/>), the <see cref="ICompositor"/>,
+/// <see cref="IProjectSettingsService"/> and <see cref="ISettingsService"/> — are injected from the container; the per-document
 /// sub-VMs are composed here around the runtime <see cref="Project"/> (which the container does
 /// not hold). One document per process today — see the scope note in
 /// <see cref="Services.ServiceCollectionExtensions"/> for the tabs/MDI evolution.
@@ -62,7 +62,8 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         UndoManager history,
         OverlayHostViewModel overlayHost,
         ICompositor compositor,
-        IProjectSettingsService projectSettings)
+        IProjectSettingsService projectSettings,
+        ISettingsService settings)
     {
         Project = project;
         History = history;
@@ -80,9 +81,10 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project);
         // TitleBar opens overlays through the shared overlay host (as IOverlayService) and reads
-        // the document's settings through IProjectSettingsService — so it never needs a root-VM
-        // reference and its menu commands stay fully DI-constructible.
-        TitleBar = new TitleBarViewModel(history, overlayHost, projectSettings);
+        // the document's settings through IProjectSettingsService plus editor-wide settings through
+        // ISettingsService — so it never needs a root-VM reference and its menu commands stay fully
+        // DI-constructible.
+        TitleBar = new TitleBarViewModel(history, overlayHost, projectSettings, settings);
 
         // The engine drives the clock + audio output and writes Playhead/IsPlaying back onto
         // Transport (which Preview, Timeline and the ruler already observe). Attach after both
@@ -110,7 +112,8 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
             new UndoManager(),
             new OverlayHostViewModel(),
             new SkiaCompositor(),
-            new ProjectSettingsService { Current = project.Settings })
+            new ProjectSettingsService { Current = project.Settings },
+            new SettingsService())
     {
         _ownsCompositor = true;
     }
