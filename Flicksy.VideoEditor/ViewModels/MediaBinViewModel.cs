@@ -32,8 +32,12 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// dispatcher. Audio-only sources short-circuit the worker and get the static music-file
 /// glyph immediately. Relocate preserves the source's <see cref="MediaSource.Id"/> so
 /// every referencing <see cref="MediaClip"/> stays linked; Remove cascades through every
-/// referencing clip plus any <see cref="Transition"/> touching those clips, confirmed through the
-/// shell's custom overlay dialog (<see cref="ConfirmDialogViewModel"/>) when clips reference it.
+/// referencing clip plus any <see cref="Transition"/> touching those clips when clips reference it.
+/// Every prompt this VM raises — import / relocate failures, already-imported, the relocate
+/// duration-change confirm, and the remove cascade confirm — goes through the shell's custom overlay
+/// dialog (<see cref="ConfirmDialogViewModel"/> via the injected <see cref="IOverlayService"/>), not
+/// a native <c>MessageBox</c>; the two cascade-style confirms defer their action into the dialog's
+/// <c>onConfirm</c> callback.
 /// </summary>
 public sealed partial class MediaBinViewModel : ObservableObject
 {
@@ -95,31 +99,39 @@ public sealed partial class MediaBinViewModel : ObservableObject
             Filter = DialogFilter,
             Title = "Import media",
         };
-        if (dialog.ShowDialog() != true) 
+        if (dialog.ShowDialog() != true)
             return;
 
+        var failures = new List<string>();
         foreach (var path in dialog.FileNames)
         {
-            TryImportFile(path);
+            TryImportFile(path, failures);
         }
+        ReportImportFailures(failures);
     }
 
     public void TryImportFiles(IEnumerable<string> paths)
     {
+        var failures = new List<string>();
         foreach (var path in paths)
         {
-            if (string.IsNullOrWhiteSpace(path)) 
+            if (string.IsNullOrWhiteSpace(path))
                 continue;
 
             string? ext = Path.GetExtension(path);
-            if (!AcceptedExtensions.Contains(ext)) 
+            if (!AcceptedExtensions.Contains(ext))
                 continue;
 
-            TryImportFile(path);
+            TryImportFile(path, failures);
         }
+        ReportImportFailures(failures);
     }
 
-    private void TryImportFile(string rawPath)
+    // Collects per-file failures into `failures` rather than showing them itself — the overlay shows
+    // one tile at a time (Show replaces), so a multi-file import surfaces every failure in a single
+    // aggregated dialog (see ReportImportFailures) instead of flashing one per file and keeping only
+    // the last.
+    private void TryImportFile(string rawPath, List<string> failures)
     {
         string fullPath;
         try
@@ -128,7 +140,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowImportError(rawPath, ex);
+            failures.Add(FormatFileError(rawPath, ex));
             return;
         }
 
@@ -145,7 +157,7 @@ public sealed partial class MediaBinViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowImportError(fullPath, ex);
+            failures.Add(FormatFileError(fullPath, ex));
             return;
         }
 
@@ -260,11 +272,12 @@ public sealed partial class MediaBinViewModel : ObservableObject
         // would leave two sources pointing at the same file and confuse subsequent edits.
         if (_project.MediaSources.Any(s => s != source && string.Equals(s.SourcePath, newPath, StringComparison.OrdinalIgnoreCase)))
         {
-            MessageBox.Show(
-                $"\"{Path.GetFileName(newPath)}\" is already imported as another source. Remove that entry first if you want to use this file.",
-                "Already imported",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            _overlay.Show(new ConfirmDialogViewModel(
+                header: "Already imported",
+                body: $"\"{Path.GetFileName(newPath)}\" is already imported as another source. " +
+                      "Remove that entry first if you want to use this file.",
+                confirmLabel: "OK",
+                close: _overlay.Close));
             return;
         }
 
@@ -279,22 +292,32 @@ public sealed partial class MediaBinViewModel : ObservableObject
             return;
         }
 
+        // A duration change can leave referencing clips overrunning the new end, so confirm before
+        // applying. Like Remove, the apply step is deferred into the confirm callback; the overlay's
+        // backdrop blocks bin / timeline edits, so `entry` and `probe` stay valid until the user answers.
         if (probe.Duration != source.Duration)
         {
-            MessageBoxResult result = MessageBox.Show(
-                $"Duration changed from {FormatDuration(source.Duration)} to {FormatDuration(probe.Duration)}. " +
-                "Clips that reference this source may now extend past the new end and need trimming.\n\nApply anyway?",
-                "Duration changed",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Question);
-
-            if (result != MessageBoxResult.OK) 
-                return;
+            _overlay.Show(new ConfirmDialogViewModel(
+                header: "Duration changed",
+                body: $"Duration changed from {FormatDuration(source.Duration)} to {FormatDuration(probe.Duration)}. " +
+                      "Clips that reference this source may now extend past the new end and need trimming.\n\nApply anyway?",
+                confirmLabel: "Apply",
+                cancelLabel: "Cancel",
+                onConfirm: () => ApplyRelocate(entry, probe, newPath),
+                close: _overlay.Close));
+            return;
         }
 
-        // Apply onto the existing MediaSource instance — Id is preserved, so every clip
-        // that referenced this source via MediaSourceId stays linked. Mutations propagate
-        // via [ObservableProperty] change notifications.
+        ApplyRelocate(entry, probe, newPath);
+    }
+
+    // Apply the relocated file onto the existing MediaSource instance — Id is preserved, so every
+    // clip that referenced this source via MediaSourceId stays linked. Mutations propagate via
+    // [ObservableProperty] change notifications. Split out of Relocate so the duration-change confirm
+    // can defer it into its onConfirm callback.
+    private void ApplyRelocate(MediaSourceViewModel entry, MediaSource probe, string newPath)
+    {
+        MediaSource source = entry.Source;
         string? oldAutoName = Path.GetFileNameWithoutExtension(source.SourcePath);
         source.SourcePath = newPath;
         // Smart auto-name: if the user never renamed (DisplayName still matches what import
@@ -608,42 +631,56 @@ public sealed partial class MediaBinViewModel : ObservableObject
         return scaled;
     }
 
-    private void ShowImportError(string path, Exception ex)
+    // One acknowledgement overlay for the whole import batch — one failure keeps the per-file
+    // wording; several are listed together so none is lost to the overlay's one-at-a-time Show.
+    private void ReportImportFailures(List<string> failures)
     {
-        var fileName = string.Empty;
-        try 
-        { 
-            fileName = Path.GetFileName(path); 
-        } 
-        catch 
-        { 
-            fileName = path; 
+        if (failures.Count == 0)
+            return;
+
+        string body = failures.Count == 1
+            ? $"Couldn't import {failures[0]}"
+            : $"Couldn't import {failures.Count} files:\n\n" + string.Join("\n", failures);
+
+        _overlay.Show(new ConfirmDialogViewModel(
+            header: "Import failed",
+            body: body,
+            confirmLabel: "OK",
+            close: _overlay.Close));
+    }
+
+    private static string FormatFileError(string path, Exception ex)
+    {
+        string fileName;
+        try
+        {
+            fileName = Path.GetFileName(path);
+        }
+        catch
+        {
+            fileName = path;
         }
 
-        MessageBox.Show(
-            $"Couldn't import {fileName}:\n\n{ex.Message}",
-            "Import failed",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        return $"{fileName}: {ex.Message}";
     }
 
     private void ShowRelocateError(string path, Exception ex)
     {
-        var fileName = string.Empty;
-        try 
-        { 
-            fileName = Path.GetFileName(path); 
-        } 
-        catch 
-        { 
-            fileName = path; 
+        string fileName;
+        try
+        {
+            fileName = Path.GetFileName(path);
+        }
+        catch
+        {
+            fileName = path;
         }
 
-        MessageBox.Show(
-            $"Couldn't open {fileName}:\n\n{ex.Message}",
-            "Relocate failed",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        _overlay.Show(new ConfirmDialogViewModel(
+            header: "Relocate failed",
+            body: $"Couldn't open {fileName}:\n\n{ex.Message}",
+            confirmLabel: "OK",
+            close: _overlay.Close));
     }
 
     private static string FormatDuration(TimeSpan d) =>

@@ -26,6 +26,9 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            // Native MessageBox by necessity: this runs in OnStartup before any window — and so
+            // before the shell's overlay host (the editor's custom ConfirmDialogViewModel layer)
+            // exists — and the app exits right after, so there's nothing to host an in-app dialog.
             MessageBox.Show(
                 $"FFmpeg initialization failed:\n{ex.Message}\n\nThe application will exit.",
                 "Flicksy.VideoEditor",

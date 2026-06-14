@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Loaded="OnLoaded">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <SolidColorBrush x:Key="TileBackgroundBrush" Color="#242424" />
         <SolidColorBrush x:Key="TileBorderBrush" Color="#55FFFFFF" />
         <SolidColorBrush x:Key="SettingValueBrush" Color="#DDDDDD" />
@@ -46,7 +47,8 @@
 
     <!-- Tile only — OverlayHost owns the dim backdrop, centering, and light-dismiss (backdrop click
          / Esc act as Cancel). DataContext is a ConfirmDialogViewModel (templated by OverlayHost).
-         Header / Body / button labels are all bound so callers customise the whole prompt. -->
+         Header / Body / button labels are all bound so callers customise the whole prompt; the Cancel
+         button collapses when HasCancel is false (single-button info / error acknowledgement). -->
     <Border Width="380"
             Background="{StaticResource TileBackgroundBrush}"
             BorderBrush="{StaticResource TileBorderBrush}"
@@ -72,9 +74,11 @@
                         Margin="0,20,0,0">
                 <Button x:Name="CancelButton"
                         Content="{Binding CancelLabel}"
+                        Visibility="{Binding HasCancel, Converter={StaticResource BoolToVisibility}}"
                         Style="{StaticResource DialogButtonStyle}"
                         Command="{Binding CancelCommand}" />
-                <Button Content="{Binding ConfirmLabel}"
+                <Button x:Name="ConfirmButton"
+                        Content="{Binding ConfirmLabel}"
                         Margin="8,0,0,0"
                         Style="{StaticResource DialogButtonStyle}"
                         Command="{Binding ConfirmCommand}" />
