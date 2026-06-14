@@ -775,6 +775,64 @@ public partial class TimelineViewModel : ObservableObject
         History.Push(new RemoveTrackCommand(this, track, index));
     }
 
+    /// <summary>
+    /// Whether <paramref name="track"/> can move one slot up — true iff the track directly above it is
+    /// the same <see cref="TrackKind"/>. Because tracks stay grouped Video → Overlay → Audio, this is
+    /// false exactly when the track is the first of its kind's group, so a track can never cross into
+    /// another kind's band. Drives the greyed-out state of the header's "Move track up" menu item and
+    /// guards <see cref="MoveTrackUp"/>.
+    /// </summary>
+    public bool CanMoveTrackUp(Track track)
+    {
+        int index = Project.Tracks.IndexOf(track);
+        return index > 0 && Project.Tracks[index - 1].Kind == track.Kind;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="track"/> can move one slot down — true iff the track directly below it
+    /// is the same <see cref="TrackKind"/> (the mirror of <see cref="CanMoveTrackUp"/>, keeping the
+    /// Video → Overlay → Audio banding intact). Drives the "Move track down" menu item's greyed state
+    /// and guards <see cref="MoveTrackDown"/>.
+    /// </summary>
+    public bool CanMoveTrackDown(Track track)
+    {
+        int index = Project.Tracks.IndexOf(track);
+        return index >= 0 && index < Project.Tracks.Count - 1 && Project.Tracks[index + 1].Kind == track.Kind;
+    }
+
+    /// <summary>
+    /// Moves <paramref name="track"/> one slot up (swapping it with the same-kind track above) as one
+    /// undoable edit — the header's "Move track up" command. No-op unless <see cref="CanMoveTrackUp"/>,
+    /// so the move never reorders across kinds (Video stays above Overlay above Audio). The clips ride
+    /// along inside the moved <see cref="Track"/> instance; selection is untouched (tracks aren't
+    /// selectable).
+    /// </summary>
+    public void MoveTrackUp(Track track) => MoveTrack(track, -1);
+
+    /// <summary>
+    /// Moves <paramref name="track"/> one slot down (swapping it with the same-kind track below) as one
+    /// undoable edit — the header's "Move track down" command. No-op unless
+    /// <see cref="CanMoveTrackDown"/>. Mirror of <see cref="MoveTrackUp"/>.
+    /// </summary>
+    public void MoveTrackDown(Track track) => MoveTrack(track, 1);
+
+    // Shared body for MoveTrackUp / MoveTrackDown. `direction` is -1 (up) or +1 (down). Re-checks the
+    // matching Can* guard so a direct/programmatic call still can't break the kind banding, then moves
+    // the track one slot and pushes the reversible MoveTrackCommand (mutate-live, push-after). Move()
+    // preserves the Track instance so both ItemsControls (headers + lanes, bound to Project.Tracks)
+    // reorder in place and the clips ride along.
+    private void MoveTrack(Track track, int direction)
+    {
+        bool allowed = direction < 0 ? CanMoveTrackUp(track) : CanMoveTrackDown(track);
+        if (!allowed)
+            return;
+
+        int from = Project.Tracks.IndexOf(track);
+        int to = from + direction;
+        Project.Tracks.Move(from, to);
+        History.Push(new MoveTrackCommand(this, from, to));
+    }
+
     // The index a new track of `kind` is inserted at to keep tracks grouped Video → Overlay → Audio
     // (the order TrackKind is declared in, which matches the timeline's top-to-bottom layout and the
     // compositor's z-grouping). Insert just before the first existing track of a higher kind, so a new

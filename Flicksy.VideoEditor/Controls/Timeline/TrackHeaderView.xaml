@@ -61,14 +61,21 @@
 
     <Border BorderBrush="{StaticResource HeaderBorderBrush}"
             BorderThickness="0,0,1,1"
-            Padding="8,4">
+            Padding="8,4"
+            ContextMenuOpening="OnContextMenuOpening">
         <Border.ContextMenu>
             <!-- Rename opens the inline TextBox (Track.BeginRename); also reachable by double-clicking
-                 the name. Delete track's confirm-if-non-empty prompt + VM routing live in code-behind
-                 (OnDeleteTrackClick) so TimelineViewModel.RemoveTrack stays a pure, testable mutation.
-                 Allowed on locked tracks per the feature's decision. -->
+                 the name. Move track up/down swap this track with its same-kind neighbour — their enabled
+                 state is set in OnContextMenuOpening (greyed at the top/bottom of the track's kind group)
+                 since the ContextMenu's popup tree can't bind the TimelineViewModel directly. Delete
+                 track's confirm-if-non-empty prompt + VM routing live in code-behind (OnDeleteTrackClick)
+                 so TimelineViewModel.RemoveTrack stays a pure, testable mutation. All allowed on locked
+                 tracks per the feature's decision. -->
             <ContextMenu>
                 <MenuItem Header="Rename" Click="OnRenameClick" />
+                <Separator />
+                <MenuItem x:Name="MoveTrackUpMenuItem" Header="Move track up" Click="OnMoveTrackUpClick" />
+                <MenuItem x:Name="MoveTrackDownMenuItem" Header="Move track down" Click="OnMoveTrackDownClick" />
                 <Separator />
                 <MenuItem Header="Delete track" Click="OnDeleteTrackClick" />
             </ContextMenu>

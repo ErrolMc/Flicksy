@@ -81,6 +81,43 @@ public partial class TrackHeaderView : UserControl
         return null;
     }
 
+    // ----- Move up / down -----
+
+    // Set the enabled state of the two "Move track up/down" items each time the menu opens. A track can
+    // only swap with a same-kind neighbour, so an item greys out at the top / bottom of its kind's group
+    // (CanMoveTrackUp / CanMoveTrackDown). Computed here rather than bound because the ContextMenu lives
+    // in its own popup tree, away from the TimelineViewModel the Can* checks need (the same reason Delete
+    // is wired via code-behind). A null timeline leaves the XAML defaults (enabled) — the click handlers
+    // then no-op, and the menu only opens once the view is in the tree anyway.
+    private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (DataContext is not Track track)
+            return;
+
+        TimelineViewModel? timeline = FindTimelineViewModel();
+        if (timeline is null)
+            return;
+
+        MoveTrackUpMenuItem.IsEnabled = timeline.CanMoveTrackUp(track);
+        MoveTrackDownMenuItem.IsEnabled = timeline.CanMoveTrackDown(track);
+    }
+
+    private void OnMoveTrackUpClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is Track track)
+        {
+            FindTimelineViewModel()?.MoveTrackUp(track);
+        }
+    }
+
+    private void OnMoveTrackDownClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is Track track)
+        {
+            FindTimelineViewModel()?.MoveTrackDown(track);
+        }
+    }
+
     // ----- Rename -----
 
     private void OnRenameClick(object sender, RoutedEventArgs e)
