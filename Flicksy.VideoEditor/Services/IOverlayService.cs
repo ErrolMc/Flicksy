@@ -4,7 +4,7 @@ namespace Flicksy.VideoEditor.Services;
 
 /// <summary>
 /// The shell's modal overlay layer — shows one centered tile at a time (Project Settings,
-/// Settings, future Export) over a dim backdrop. Lets any VM open an overlay without a
+/// Settings, confirmations, future Export) over a dim backdrop. Lets any VM open an overlay without a
 /// reference to the root VM. Implemented by the bindable
 /// <see cref="ViewModels.OverlayHostViewModel"/>, which the OverlayHost control binds.
 /// </summary>

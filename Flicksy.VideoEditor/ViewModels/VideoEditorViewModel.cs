@@ -79,7 +79,7 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         // tools and menu Undo/Redo push to / read from the same stack.
         Timeline = new TimelineViewModel(project, Transport, history);
         Inspector = new InspectorViewModel();
-        MediaBin = new MediaBinViewModel(project);
+        MediaBin = new MediaBinViewModel(project, overlayHost);
         // TitleBar opens overlays through the shared overlay host (as IOverlayService) and reads
         // the document's settings through IProjectSettingsService plus editor-wide settings through
         // ISettingsService — so it never needs a root-VM reference and its menu commands stay fully

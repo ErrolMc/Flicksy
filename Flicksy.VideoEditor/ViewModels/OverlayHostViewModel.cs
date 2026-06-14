@@ -6,7 +6,7 @@ namespace Flicksy.VideoEditor.ViewModels;
 
 /// <summary>
 /// The shell's modal overlay layer — a reusable host for one centered tile at a time
-/// (Project Settings, Settings, future Export). The bindable implementation of
+/// (Project Settings, Settings, confirmations, future Export). The bindable implementation of
 /// <see cref="Services.IOverlayService"/>: <see cref="Controls.OverlayHost"/> binds
 /// <see cref="CurrentOverlay"/> and templates it into the matching tile view, and any VM
 /// can open an overlay through the service via <see cref="Show"/>/<see cref="Close"/>.

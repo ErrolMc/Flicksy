@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Flicksy.VideoEditor.Project;
+using Flicksy.VideoEditor.Services;
 using Flicksy.VideoEditor.ViewModels;
 
 namespace Flicksy.VideoEditor.Controls.Timeline;
@@ -18,9 +19,11 @@ namespace Flicksy.VideoEditor.Controls.Timeline;
 /// commit, Esc cancels, and a window-level click capture handles clicks on the (non-focusable) timeline.
 /// </para>
 /// <para>
-/// The right-click menu also offers "Delete track". The confirm-if-non-empty prompt lives here in the
-/// View (so <see cref="TimelineViewModel.RemoveTrack"/> stays a headless-testable pure mutation); the
-/// host VM is reached by walking the visual tree, mirroring <c>ClipView</c>.
+/// The right-click menu also offers "Delete track". When the track has clips a custom
+/// <see cref="ConfirmDialogViewModel"/> is shown through the shell's <see cref="IOverlayService"/>
+/// (not a native MessageBox); confirming calls <see cref="TimelineViewModel.RemoveTrack"/>, which
+/// stays a headless-testable pure mutation. Both the timeline VM and the overlay service are reached
+/// by walking the visual tree, mirroring <c>ClipView</c>.
 /// </para>
 /// </summary>
 public partial class TrackHeaderView : UserControl
@@ -38,9 +41,10 @@ public partial class TrackHeaderView : UserControl
 
     // ----- Delete -----
 
-    // Delete the track this header represents. Confirms only when the track has clips on it (the user
-    // asked for a prompt "if there's anything on that track"); empty tracks delete silently. Allowed on
-    // locked tracks too — lock guards clip edits, not the track itself.
+    // Delete the track this header represents. A track with clips gets a custom confirm dialog shown
+    // through the shell's overlay service (the user asked for a non-native prompt "if there's anything
+    // on that track"); empty tracks delete silently. Allowed on locked tracks too — lock guards clip
+    // edits, not the track itself.
     private void OnDeleteTrackClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not Track track)
@@ -50,19 +54,23 @@ public partial class TrackHeaderView : UserControl
         if (timeline is null)
             return;
 
-        if (track.Clips.Count > 0)
+        if (track.Clips.Count == 0)
         {
-            MessageBoxResult result = MessageBox.Show(
-                $"\"{track.Name}\" contains {track.Clips.Count} clip(s).\n\nDelete the track and everything on it?",
-                "Delete track",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes)
-                return;
+            timeline.RemoveTrack(track);
+            return;
         }
 
-        timeline.RemoveTrack(track);
+        IOverlayService? overlay = FindOverlayService();
+        if (overlay is null)
+            return;
+
+        overlay.Show(new ConfirmDialogViewModel(
+            header: "Delete track",
+            body: $"\"{track.Name}\" contains {track.Clips.Count} clip(s).\n\nDelete the track and everything on it?",
+            confirmLabel: "Delete",
+            cancelLabel: "Cancel",
+            onConfirm: () => timeline.RemoveTrack(track),
+            close: overlay.Close));
     }
 
     // Walk the visual tree to the host TimelineViewModel (the timeline surface's DataContext),
@@ -79,6 +87,14 @@ public partial class TrackHeaderView : UserControl
             current = VisualTreeHelper.GetParent(current);
         }
         return null;
+    }
+
+    // The shell's overlay host lives on the root VideoEditorViewModel (the window's DataContext); the
+    // custom Delete-track confirm is shown through it. Returns null only outside a real shell (e.g.
+    // the XAML designer), where the caller no-ops just like a missing TimelineViewModel.
+    private IOverlayService? FindOverlayService()
+    {
+        return (Window.GetWindow(this)?.DataContext as VideoEditorViewModel)?.OverlayHost;
     }
 
     // ----- Move up / down -----

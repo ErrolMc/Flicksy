@@ -17,6 +17,7 @@ using FFMediaToolkit.Decoding;
 using FFMediaToolkit.Graphics;
 using Flicksy.Drawing.Helpers;
 using Flicksy.VideoEditor.Project;
+using Flicksy.VideoEditor.Services;
 using Microsoft.Win32;
 
 namespace Flicksy.VideoEditor.ViewModels;
@@ -31,7 +32,8 @@ namespace Flicksy.VideoEditor.ViewModels;
 /// dispatcher. Audio-only sources short-circuit the worker and get the static music-file
 /// glyph immediately. Relocate preserves the source's <see cref="MediaSource.Id"/> so
 /// every referencing <see cref="MediaClip"/> stays linked; Remove cascades through every
-/// referencing clip plus any <see cref="Transition"/> touching those clips.
+/// referencing clip plus any <see cref="Transition"/> touching those clips, confirmed through the
+/// shell's custom overlay dialog (<see cref="ConfirmDialogViewModel"/>) when clips reference it.
 /// </summary>
 public sealed partial class MediaBinViewModel : ObservableObject
 {
@@ -47,14 +49,16 @@ public sealed partial class MediaBinViewModel : ObservableObject
         "Media files|*.mp4;*.mov;*.mkv;*.webm;*.avi;*.m4v;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg|All files|*.*";
 
     private readonly Project.Project _project;
+    private readonly IOverlayService _overlay;
     private readonly Dispatcher _dispatcher;
     private readonly Channel<MediaSource> _thumbnailQueue;
     private readonly Dictionary<Guid, MediaSourceViewModel> _wrappersById = new();
     private ImageSource? _audioGlyph;
 
-    public MediaBinViewModel(Project.Project project)
+    public MediaBinViewModel(Project.Project project, IOverlayService overlay)
     {
         _project = project;
+        _overlay = overlay;
         _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
         MediaSources = new ObservableCollection<MediaSourceViewModel>();
@@ -313,8 +317,10 @@ public sealed partial class MediaBinViewModel : ObservableObject
     [RelayCommand]
     private void Remove(MediaSourceViewModel? entry)
     {
-        if (entry is null) return;
-        var source = entry.Source;
+        if (entry is null)
+            return;
+
+        MediaSource source = entry.Source;
 
         // Find every MediaClip referencing this source, paired with its parent Track, so
         // the cascade can splice both the clip and any transition touching it. Track has no
@@ -331,22 +337,31 @@ public sealed partial class MediaBinViewModel : ObservableObject
             }
         }
 
-        if (referencing.Count > 0)
+        // Unreferenced source: nothing to lose, remove it immediately. Referenced: confirm the
+        // cascade through the shell's custom dialog (overlay service) and delete the clips only on
+        // Yes. The dim backdrop blocks timeline edits while it's open, so `referencing` can't go
+        // stale between the prompt and the confirm callback.
+        if (referencing.Count == 0)
         {
-            MessageBoxResult result = MessageBox.Show(
-                $"\"{source.DisplayName}\" is used by {referencing.Count} clip(s) on the timeline.\n\n" +
-                "Remove the source and delete those clips?",
-                "Remove source",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes) 
-                return;
+            _project.MediaSources.Remove(source);
+            return;
         }
 
-        // Cascade: remove each referencing clip plus any transitions on its track that
-        // touched it. A transition that referenced two cascaded clips disappears on the
-        // first pass — the second pass simply finds nothing.
+        _overlay.Show(new ConfirmDialogViewModel(
+            header: "Remove source",
+            body: $"\"{source.DisplayName}\" is used by {referencing.Count} clip(s) on the timeline.\n\n" +
+                  "Remove the source and delete those clips?",
+            confirmLabel: "Remove",
+            cancelLabel: "Cancel",
+            onConfirm: () => RemoveSourceCascade(source, referencing),
+            close: _overlay.Close));
+    }
+
+    // Splice out each referencing clip plus any transitions on its track that touched it, then
+    // drop the source. A transition that referenced two cascaded clips disappears on the first
+    // pass — the second pass simply finds nothing.
+    private void RemoveSourceCascade(MediaSource source, List<(Track Track, MediaClip Clip)> referencing)
+    {
         foreach ((Track track, MediaClip clip) in referencing)
         {
             track.Clips.Remove(clip);
