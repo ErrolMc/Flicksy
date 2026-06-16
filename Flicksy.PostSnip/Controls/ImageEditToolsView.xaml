@@ -144,13 +144,16 @@
                         </Rectangle>
                     </Grid>
                 </Button>
-                <Popup PlacementTarget="{Binding ElementName=PenButton}"
+                <Popup x:Name="PenSettingsPopup"
+                       PlacementTarget="{Binding ElementName=PenButton}"
                        Placement="Bottom"
                        VerticalOffset="6"
                        HorizontalOffset="-138"
                        StaysOpen="False"
                        AllowsTransparency="True"
-                       IsOpen="{Binding IsPenSettingsOpen, Mode=TwoWay}">
+                       IsOpen="{Binding IsPenSettingsOpen, Mode=TwoWay}"
+                       Opened="OnPenSettingsPopupOpened"
+                       Closed="OnPenSettingsPopupClosed">
                     <controls:PenSettingsView DataContext="{Binding PenSettings}" />
                 </Popup>
             </StackPanel>

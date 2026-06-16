@@ -14,6 +14,34 @@ public partial class ImageEditToolsView : UserControl
         InitializeComponent();
     }
 
+    private void OnPenSettingsPopupOpened(object sender, System.EventArgs e)
+    {
+        // Begin a style-edit session if a pen stroke is selected — color picks and size drags
+        // inside the popup mutate the stroke live, but no undo entry is pushed until the popup
+        // closes (see OnPenSettingsPopupClosed). Mirrors the shape/text-settings flow. The pen
+        // popup keeps its own fixed placement offset, so this does not re-center it.
+        if (TryGetSelectedPenItem(out var drawing, out var penItem))
+        {
+            // Sync the popup's size slider / swatch to the selected stroke first so the user sees
+            // its actual style. Done BEFORE BeginPenStyleEdit so the snapshot captures the stroke's
+            // real state (the sync writes the same values back via the existing cascade —
+            // PenStrokeItem's SetProperty guards short-circuit no-op writes).
+            if (DataContext is ImageEditToolsViewModel tools)
+            {
+                tools.PenSettings.SyncFromPenStrokeItem(penItem);
+            }
+            drawing.BeginPenStyleEdit(penItem);
+        }
+    }
+
+    private void OnPenSettingsPopupClosed(object sender, System.EventArgs e)
+    {
+        if (TryGetDrawingViewModel(out var drawing))
+        {
+            drawing.EndPenStyleEdit();
+        }
+    }
+
     private void OnShapeSettingsPopupOpened(object sender, System.EventArgs e)
     {
         CenterPopupOnPlacementTarget(sender);
@@ -96,6 +124,21 @@ public partial class ImageEditToolsView : UserControl
             return false;
         }
         textItem = t;
+        return true;
+    }
+
+    private bool TryGetSelectedPenItem(out DrawingViewModel drawing, out PenStrokeItem penItem)
+    {
+        penItem = default!;
+        if (!TryGetDrawingViewModel(out drawing))
+        {
+            return false;
+        }
+        if (drawing.SelectedItem is not PenStrokeItem p)
+        {
+            return false;
+        }
+        penItem = p;
         return true;
     }
 

@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Flicksy.Drawing.Source;
 
 namespace Flicksy.PostSnip.ViewModels;
 
@@ -49,6 +51,43 @@ public partial class PenSettingsViewModel : ObservableObject
 
         option.IsSelected = true;
         SelectedColor = option;
+    }
+
+    /// <summary>
+    /// Drive the size slider + selected swatch from an existing pen stroke — used when the user
+    /// opens the pen settings while a stroke is selected so the popup reflects what's actually on
+    /// the canvas. The cascade through <c>OnSelectedPenStyleChanged</c> writes these values back to
+    /// the same stroke; <see cref="PenStrokeItem"/>'s <c>SetProperty</c> guards short-circuit no-op
+    /// writes. An unmatched brush leaves the swatch selection unchanged.
+    /// </summary>
+    public void SyncFromPenStrokeItem(PenStrokeItem item)
+    {
+        Size = Math.Clamp(item.Thickness, MinSize, MaxSize);
+
+        if (item.Brush is not SolidColorBrush solid)
+        {
+            return;
+        }
+
+        Color target = solid.Color;
+        foreach (PenColorOption option in Colors)
+        {
+            if (option.Brush is not SolidColorBrush swatch)
+            {
+                continue;
+            }
+            Color s = swatch.Color;
+            if (s.R != target.R || s.G != target.G || s.B != target.B || s.A != target.A)
+            {
+                continue;
+            }
+
+            if (!ReferenceEquals(SelectedColor, option))
+            {
+                SelectColor(option);
+            }
+            return;
+        }
     }
 
     private static IEnumerable<PenColorOption> CreateColors()

@@ -80,10 +80,12 @@ public partial class PostSnipViewModel : ObservableObject
                     drawing.EndEditText(commit: true);
                 }
 
-                // Hide selection corner/rotate handles whenever the Text or Shapes tool is
-                // active — for Text to keep focus on typing, for Shapes because corner-resize
+                // Hide selection corner/rotate handles whenever the Text, Shapes or Pen tool is
+                // active — for Text to keep focus on typing, for Shapes/Pen because corner-resize
                 // is a Select-tool gesture and would be non-functional while restyling.
-                SelectionOverlay.ShowHandles = !imageEditTools.IsTextActive && !imageEditTools.IsShapesActive;
+                SelectionOverlay.ShowHandles = !imageEditTools.IsTextActive
+                    && !imageEditTools.IsShapesActive
+                    && !imageEditTools.IsPenActive;
 
                 // Crop tool transitions: begin/commit an edit session on the crop VM.
                 if (imageEditTools.IsCropActive && !cropOverlay.IsActive)
@@ -106,15 +108,22 @@ public partial class PostSnipViewModel : ObservableObject
                 bool keepShapeSelection = imageEditTools.IsShapesActive
                     && drawing.SelectedItem is ShapeItem;
 
+                // Likewise keep a selected pen stroke alive when switching to the Pen tool so its
+                // settings popup restyles the selection.
+                bool keepPenSelection = imageEditTools.IsPenActive
+                    && drawing.SelectedItem is PenStrokeItem;
+
                 SelectionOverlay.IsActive = imageEditTools.IsSelectActive
                     || drawing.EditingTextItem is not null
                     || keepTextSelection
-                    || keepShapeSelection;
+                    || keepShapeSelection
+                    || keepPenSelection;
 
                 if (!imageEditTools.IsSelectActive
                     && drawing.EditingTextItem is null
                     && !keepTextSelection
-                    && !keepShapeSelection)
+                    && !keepShapeSelection
+                    && !keepPenSelection)
                 {
                     drawing.SelectedItem = null;
                 }

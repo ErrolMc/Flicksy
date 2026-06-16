@@ -13,14 +13,14 @@ public partial class DrawingView : UserControl
             nameof(StrokeBrush),
             typeof(Brush),
             typeof(DrawingView),
-            new PropertyMetadata(Brushes.Black));
+            new PropertyMetadata(Brushes.Black, OnSelectedPenStyleChanged));
 
     public static readonly DependencyProperty StrokeThicknessProperty =
         DependencyProperty.Register(
             nameof(StrokeThickness),
             typeof(double),
             typeof(DrawingView),
-            new PropertyMetadata(1.0));
+            new PropertyMetadata(1.0, OnSelectedPenStyleChanged));
 
     public static readonly DependencyProperty IsErasingProperty =
         DependencyProperty.Register(
@@ -242,6 +242,23 @@ public partial class DrawingView : UserControl
         else if (e.Property == TextOutlineThicknessProperty && e.NewValue is double thickness)
         {
             text.SetOutline(view.TextOutlineBrush, thickness);
+        }
+    }
+
+    private static void OnSelectedPenStyleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not DrawingView view || view.ViewModel?.SelectedItem is not PenStrokeItem pen)
+        {
+            return;
+        }
+
+        if (e.Property == StrokeBrushProperty && e.NewValue is Brush brush)
+        {
+            pen.SetStyle(brush, view.StrokeThickness);
+        }
+        else if (e.Property == StrokeThicknessProperty && e.NewValue is double thickness)
+        {
+            pen.SetStyle(view.StrokeBrush, thickness);
         }
     }
 

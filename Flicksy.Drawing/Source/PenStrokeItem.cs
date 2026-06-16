@@ -7,11 +7,13 @@ namespace Flicksy.Drawing.Source;
 public sealed class PenStrokeItem : DrawingItem
 {
     private PointCollection _basePoints = new();
+    private Brush _brush;
+    private double _thickness;
 
     public PenStrokeItem(Brush brush, double thickness)
     {
-        Brush = brush;
-        Thickness = thickness;
+        _brush = brush;
+        _thickness = thickness;
     }
 
     public PointCollection BasePoints
@@ -20,9 +22,31 @@ public sealed class PenStrokeItem : DrawingItem
         private set => SetProperty(ref _basePoints, value);
     }
 
-    public Brush Brush { get; }
+    public Brush Brush
+    {
+        get => _brush;
+        private set => SetProperty(ref _brush, value);
+    }
 
-    public double Thickness { get; }
+    public double Thickness
+    {
+        get => _thickness;
+        private set
+        {
+            if (SetProperty(ref _thickness, value))
+            {
+                // Thickness widens the rendered stroke and inflates CanonicalBounds (by
+                // thickness/2), so re-notify Geometry to refresh the selection overlay's bounds.
+                OnPropertyChanged(nameof(Geometry));
+            }
+        }
+    }
+
+    public void SetStyle(Brush brush, double thickness)
+    {
+        Brush = brush;
+        Thickness = Math.Max(0d, thickness);
+    }
 
     public override Rect CanonicalBounds
     {

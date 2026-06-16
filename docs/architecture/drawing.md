@@ -31,7 +31,7 @@ Icon PNGs (rotate puck, shape options, toolbar buttons) live in **Flicksy.Icons*
 
 | ViewModel | Owns / Coordinates |
 | --- | --- |
-| [DrawingViewModel](../../Flicksy.Drawing/ViewModels/DrawingViewModel.cs) | `ObservableCollection<DrawingItem> Items` (z-ordered), `SelectedItem`, `EditingTextItem`, `History` (UndoManager). All gesture transitions (`BeginPenStroke`/`End...`, `BeginShape`/`End...`, `BeginText`/`BeginEditText`/`EndEditText`, `BeginTextStyleEdit`/`End...`). Layer move + delete commands. |
+| [DrawingViewModel](../../Flicksy.Drawing/ViewModels/DrawingViewModel.cs) | `ObservableCollection<DrawingItem> Items` (z-ordered), `SelectedItem`, `EditingTextItem`, `History` (UndoManager). All gesture transitions (`BeginPenStroke`/`End...`, `BeginShape`/`End...`, `BeginText`/`BeginEditText`/`EndEditText`, `BeginTextStyleEdit`/`End...`, `BeginShapeStyleEdit`/`End...`, `BeginPenStyleEdit`/`End...`). Layer move + delete commands. |
 | [SelectionOverlayViewModel](../../Flicksy.Drawing/ViewModels/SelectionOverlayViewModel.cs) | `SelectedItem` + `IsActive` + `ShowHandles` + cached `CanonicalBounds`. Subscribes to the item's `Geometry`/`Transform.Changed` so the overlay redraws when the item moves. |
 
 ## 3. Drawing model (Flicksy.Drawing/Source)
@@ -40,8 +40,8 @@ All items inherit [DrawingItem](../../Flicksy.Drawing/Source/DrawingItem.cs) whi
 
 | Item | Geometry | Notes |
 | --- | --- | --- |
-| [PenStrokeItem](../../Flicksy.Drawing/Source/PenStrokeItem.cs) | Catmull-Rom-style smoothed `PathGeometry` over a `PointCollection`. | Brush + thickness immutable per stroke. Bounds inflated by thickness/2. |
-| [ShapeItem](../../Flicksy.Drawing/Source/ShapeItem.cs) | `Square` (Rect), `Circle` (Ellipse), `Line` (LineGeometry), `Arrow` (PathGeometry: shaft + filled arrowhead triangle). | `EffectiveFill`/`EffectiveStroke` exposed for the XAML data template — arrow's "fill" is its outline brush so the head fills solidly. `IsDegenerate` predicate suppresses commit on tap-without-drag. |
+| [PenStrokeItem](../../Flicksy.Drawing/Source/PenStrokeItem.cs) | Catmull-Rom-style smoothed `PathGeometry` over a `PointCollection`. | Brush + thickness mutable via `SetStyle` (restyle after creation). Bounds inflated by thickness/2; a thickness change re-notifies `Geometry` so the overlay re-measures. |
+| [ShapeItem](../../Flicksy.Drawing/Source/ShapeItem.cs) | `Square` (Rect), `Circle` (Ellipse), `Line` (LineGeometry), `Arrow` (PathGeometry: shaft + filled arrowhead triangle). | `EffectiveFill`/`EffectiveStroke` exposed for the XAML data template — arrow's "fill" is its outline brush so the head fills solidly. `IsDegenerate` predicate suppresses commit on tap-without-drag. Fill/Outline/OutlineThickness mutable via `SetFill`/`SetOutline` (restyle after creation); `Kind` immutable. Changing thickness `RebuildGeometry`s — the arrowhead size derives from it. |
 | [TextItem](../../Flicksy.Drawing/Source/TextItem.cs) | `FormattedText.BuildGeometry(origin)`. | Properties are mutable via `SetText`/`SetFontFamily`/`SetFontSize`/`SetFill`/`SetOutline`. Geometry rebuilds on every mutation. `IsEditing` flag tracks the in-place editor. |
 
 ## 4. Interaction system (Flicksy.Drawing/Interaction)
@@ -83,6 +83,8 @@ Convention: commands are pushed **after** the change has already mutated state (
 | [MoveLayerCommand](../../Flicksy.Drawing/Undo/Commands/MoveLayerCommand.cs) | Layer up/down toolbar buttons. |
 | [TextEditCommand](../../Flicksy.Drawing/Undo/Commands/TextEditCommand.cs) | Existing TextItem's text changed in place. |
 | [TextStyleCommand](../../Flicksy.Drawing/Undo/Commands/TextStyleCommand.cs) | Batch of font/size/fill/outline changes from the Text settings popup (captured on open, pushed on close). Uses `TextStyleSnapshot`. |
+| [ShapeStyleCommand](../../Flicksy.Drawing/Undo/Commands/ShapeStyleCommand.cs) | Batch of fill/outline/thickness changes to a selected shape from the Shape settings popup (captured on open, pushed on close). Uses `ShapeStyleSnapshot`. Mirrors `TextStyleCommand`. |
+| [PenStyleCommand](../../Flicksy.Drawing/Undo/Commands/PenStyleCommand.cs) | Batch of brush/thickness changes to a selected pen stroke from the Pen settings popup (captured on open, pushed on close). Uses `PenStyleSnapshot`. Mirrors `ShapeStyleCommand`. |
 | [CropCommand](../../Flicksy.PostSnip/Undo/Commands/CropCommand.cs) | Crop committed (push at `CropOverlayViewModel.CommitEdit` if before/after differ). Undo/redo call `ApplyCommittedCrop`. |
 
 ## 6. Media (Flicksy.Drawing/Media)
