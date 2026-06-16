@@ -30,6 +30,10 @@ public partial class DrawingViewModel : ObservableObject
     private TextItem? _styleEditItem;
     private TextStyleSnapshot _styleEditBefore;
 
+    // Shape style-edit session state (popup-batched). Captured in BeginShapeStyleEdit.
+    private ShapeItem? _shapeStyleEditItem;
+    private ShapeStyleSnapshot _shapeStyleEditBefore;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedItem))]
     [NotifyPropertyChangedFor(nameof(CanMoveSelectedItemUp))]
@@ -252,6 +256,30 @@ public partial class DrawingViewModel : ObservableObject
         }
     }
 
+    public void BeginShapeStyleEdit(ShapeItem item)
+    {
+        _shapeStyleEditItem = item;
+        _shapeStyleEditBefore = ShapeStyleSnapshot.Capture(item);
+    }
+
+    public void EndShapeStyleEdit()
+    {
+        if (_shapeStyleEditItem is not { } item)
+        {
+            return;
+        }
+
+        ShapeStyleSnapshot before = _shapeStyleEditBefore;
+        _shapeStyleEditItem = null;
+        _shapeStyleEditBefore = default;
+
+        var after = ShapeStyleSnapshot.Capture(item);
+        if (!before.Equals(after) && Items.Contains(item))
+        {
+            History.Push(new ShapeStyleCommand(this, item, before, after));
+        }
+    }
+
     public void Clear()
     {
         _currentPen = null;
@@ -265,6 +293,8 @@ public partial class DrawingViewModel : ObservableObject
         _pendingNewTextItem = null;
         _styleEditItem = null;
         _styleEditBefore = default;
+        _shapeStyleEditItem = null;
+        _shapeStyleEditBefore = default;
 
         if (EditingTextItem is { } editing)
         {

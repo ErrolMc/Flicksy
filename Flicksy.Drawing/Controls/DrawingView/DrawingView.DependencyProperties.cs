@@ -97,21 +97,21 @@ public partial class DrawingView : UserControl
             nameof(FillBrush),
             typeof(Brush),
             typeof(DrawingView),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnSelectedShapeStyleChanged));
 
     public static readonly DependencyProperty OutlineBrushProperty =
         DependencyProperty.Register(
             nameof(OutlineBrush),
             typeof(Brush),
             typeof(DrawingView),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnSelectedShapeStyleChanged));
 
     public static readonly DependencyProperty OutlineThicknessProperty =
         DependencyProperty.Register(
             nameof(OutlineThickness),
             typeof(double),
             typeof(DrawingView),
-            new PropertyMetadata(4.0));
+            new PropertyMetadata(4.0, OnSelectedShapeStyleChanged));
 
     public static readonly DependencyProperty ContentScaleProperty =
         DependencyProperty.Register(
@@ -242,6 +242,27 @@ public partial class DrawingView : UserControl
         else if (e.Property == TextOutlineThicknessProperty && e.NewValue is double thickness)
         {
             text.SetOutline(view.TextOutlineBrush, thickness);
+        }
+    }
+
+    private static void OnSelectedShapeStyleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not DrawingView view || view.ViewModel?.SelectedItem is not ShapeItem shape)
+        {
+            return;
+        }
+
+        if (e.Property == FillBrushProperty)
+        {
+            shape.SetFill(e.NewValue as Brush);
+        }
+        else if (e.Property == OutlineBrushProperty)
+        {
+            shape.SetOutline(e.NewValue as Brush, view.OutlineThickness);
+        }
+        else if (e.Property == OutlineThicknessProperty && e.NewValue is double thickness)
+        {
+            shape.SetOutline(view.OutlineBrush, thickness);
         }
     }
 }

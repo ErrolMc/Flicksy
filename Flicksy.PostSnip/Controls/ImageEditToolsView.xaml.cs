@@ -17,6 +17,30 @@ public partial class ImageEditToolsView : UserControl
     private void OnShapeSettingsPopupOpened(object sender, System.EventArgs e)
     {
         CenterPopupOnPlacementTarget(sender);
+
+        // Begin a style-edit session if a shape item is selected — slider drags and color
+        // picks inside the popup mutate the item live, but no undo entry is pushed until the
+        // popup closes (see OnShapeSettingsPopupClosed). Mirrors the text-settings flow.
+        if (TryGetSelectedShapeItem(out var drawing, out var shapeItem))
+        {
+            // Sync the popup's sliders / swatches to the selected shape first so the user sees
+            // its actual style. Done BEFORE BeginShapeStyleEdit so the snapshot captures the
+            // item's real state (the sync writes the same values back via the existing
+            // cascade — ShapeItem's SetProperty guards short-circuit no-op writes).
+            if (DataContext is ImageEditToolsViewModel tools)
+            {
+                tools.ShapeSettings.SyncFromShapeItem(shapeItem);
+            }
+            drawing.BeginShapeStyleEdit(shapeItem);
+        }
+    }
+
+    private void OnShapeSettingsPopupClosed(object sender, System.EventArgs e)
+    {
+        if (TryGetDrawingViewModel(out var drawing))
+        {
+            drawing.EndShapeStyleEdit();
+        }
     }
 
     private void OnTextSettingsPopupOpened(object sender, System.EventArgs e)
@@ -72,6 +96,21 @@ public partial class ImageEditToolsView : UserControl
             return false;
         }
         textItem = t;
+        return true;
+    }
+
+    private bool TryGetSelectedShapeItem(out DrawingViewModel drawing, out ShapeItem shapeItem)
+    {
+        shapeItem = default!;
+        if (!TryGetDrawingViewModel(out drawing))
+        {
+            return false;
+        }
+        if (drawing.SelectedItem is not ShapeItem s)
+        {
+            return false;
+        }
+        shapeItem = s;
         return true;
     }
 

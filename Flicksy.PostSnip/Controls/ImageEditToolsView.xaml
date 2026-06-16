@@ -200,7 +200,8 @@
                        StaysOpen="False"
                        AllowsTransparency="True"
                        IsOpen="{Binding IsShapeSettingsOpen, Mode=TwoWay}"
-                       Opened="OnShapeSettingsPopupOpened">
+                       Opened="OnShapeSettingsPopupOpened"
+                       Closed="OnShapeSettingsPopupClosed">
                     <controls:ShapeSettingsView DataContext="{Binding ShapeSettings}" />
                 </Popup>
                 <Button x:Name="TextButton"

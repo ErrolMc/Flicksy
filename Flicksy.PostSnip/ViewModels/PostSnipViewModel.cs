@@ -80,9 +80,10 @@ public partial class PostSnipViewModel : ObservableObject
                     drawing.EndEditText(commit: true);
                 }
 
-                // Hide selection corner/rotate handles whenever the Text tool is active
-                // (with or without an in-progress edit) to keep focus on typing.
-                SelectionOverlay.ShowHandles = !imageEditTools.IsTextActive;
+                // Hide selection corner/rotate handles whenever the Text or Shapes tool is
+                // active — for Text to keep focus on typing, for Shapes because corner-resize
+                // is a Select-tool gesture and would be non-functional while restyling.
+                SelectionOverlay.ShowHandles = !imageEditTools.IsTextActive && !imageEditTools.IsShapesActive;
 
                 // Crop tool transitions: begin/commit an edit session on the crop VM.
                 if (imageEditTools.IsCropActive && !cropOverlay.IsActive)
@@ -100,13 +101,20 @@ public partial class PostSnipViewModel : ObservableObject
                 bool keepTextSelection = imageEditTools.IsTextActive
                     && drawing.SelectedItem is TextItem;
 
+                // Keep a selected shape alive when switching to the Shapes tool so its style
+                // popup restyles the selection (mirrors keepTextSelection for the Text tool).
+                bool keepShapeSelection = imageEditTools.IsShapesActive
+                    && drawing.SelectedItem is ShapeItem;
+
                 SelectionOverlay.IsActive = imageEditTools.IsSelectActive
                     || drawing.EditingTextItem is not null
-                    || keepTextSelection;
+                    || keepTextSelection
+                    || keepShapeSelection;
 
                 if (!imageEditTools.IsSelectActive
                     && drawing.EditingTextItem is null
-                    && !keepTextSelection)
+                    && !keepTextSelection
+                    && !keepShapeSelection)
                 {
                     drawing.SelectedItem = null;
                 }

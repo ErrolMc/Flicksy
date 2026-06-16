@@ -6,15 +6,18 @@ namespace Flicksy.Drawing.Source;
 
 public sealed class ShapeItem : DrawingItem
 {
+    private Brush? _fill;
+    private Brush? _outline;
+    private double _outlineThickness;
     private Point _p0;
     private Point _p1;
 
     public ShapeItem(ShapeKind kind, Point start, Brush? fill, Brush? outline, double outlineThickness)
     {
         Kind = kind;
-        Fill = fill;
-        Outline = outline;
-        OutlineThickness = Math.Max(0d, outlineThickness);
+        _fill = fill;
+        _outline = outline;
+        _outlineThickness = Math.Max(0d, outlineThickness);
         _p0 = start;
         _p1 = start;
         RebuildGeometry();
@@ -22,11 +25,45 @@ public sealed class ShapeItem : DrawingItem
 
     public ShapeKind Kind { get; }
 
-    public Brush? Fill { get; }
+    public Brush? Fill
+    {
+        get => _fill;
+        private set
+        {
+            if (SetProperty(ref _fill, value))
+            {
+                OnPropertyChanged(nameof(EffectiveFill));
+            }
+        }
+    }
 
-    public Brush? Outline { get; }
+    public Brush? Outline
+    {
+        get => _outline;
+        private set
+        {
+            if (SetProperty(ref _outline, value))
+            {
+                OnPropertyChanged(nameof(EffectiveStroke));
+                OnPropertyChanged(nameof(EffectiveFill));
+            }
+        }
+    }
 
-    public double OutlineThickness { get; }
+    public double OutlineThickness
+    {
+        get => _outlineThickness;
+        private set
+        {
+            if (SetProperty(ref _outlineThickness, value))
+            {
+                // The arrowhead size derives from the outline thickness, so the geometry
+                // rebuilds; that also re-notifies the selection overlay (CanonicalBounds is
+                // inflated by thickness/2).
+                RebuildGeometry();
+            }
+        }
+    }
 
     /// <summary>
     /// Brush used by the WPF Path's Stroke. Always the user's outline brush.
@@ -66,6 +103,17 @@ public sealed class ShapeItem : DrawingItem
         _p1 = p1;
         OnPropertyChanged(nameof(P1));
         RebuildGeometry();
+    }
+
+    public void SetFill(Brush? fill)
+    {
+        Fill = fill;
+    }
+
+    public void SetOutline(Brush? outline, double thickness)
+    {
+        Outline = outline;
+        OutlineThickness = Math.Max(0d, thickness);
     }
 
     public bool IsDegenerate

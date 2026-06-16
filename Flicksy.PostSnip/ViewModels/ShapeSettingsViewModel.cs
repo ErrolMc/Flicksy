@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -112,6 +114,27 @@ public partial class ShapeSettingsViewModel : ObservableObject
 
         option.IsSelected = true;
         SelectedShape = option;
+    }
+
+    /// <summary>
+    /// Drive every setting from an existing shape item — used when the user opens the shape
+    /// settings while a shape is selected so the popup reflects what's actually on the canvas.
+    /// The cascade through <c>OnSelectedShapeStyleChanged</c> writes these values back to the
+    /// same item; the <c>SetProperty</c> guards in <see cref="ShapeItem"/> short-circuit no-op
+    /// writes. Kind is immutable, so the shape picker is synced only to keep the Fill pill's
+    /// enabled state correct (and to seed the next-drawn shape) — it does not restyle the item.
+    /// </summary>
+    public void SyncFromShapeItem(ShapeItem item)
+    {
+        ShapeOption? match = Shapes.FirstOrDefault(s => s.Kind == item.Kind);
+        if (match is not null && !ReferenceEquals(SelectedShape, match))
+        {
+            SelectShape(match);
+        }
+
+        FillSettings.SyncFromBrush(item.Fill);
+        OutlineSettings.SyncFromBrush(item.Outline);
+        OutlineSettings.Size = Math.Clamp(item.OutlineThickness, OutlineSettings.MinSize, OutlineSettings.MaxSize);
     }
 
     private static IEnumerable<ShapeOption> CreateShapes()
