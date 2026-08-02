@@ -206,14 +206,15 @@ public partial class VideoEditorWindow : Window
 
     private void ApplyRightRailState()
     {
-        if (ViewModel.SelectedClip is not null)
+        if (ViewModel.SelectedClip is Project.MediaClip)
         {
             RightRailColumn.Width = new GridLength(RightRailWidth);
         }
         else
         {
-            // No selection → no per-clip inspectors are meaningful; hide the rail
-            // entirely and force any open inspector closed.
+            // No MediaClip selected → the per-clip inspectors (Speed/Audio/…) aren't meaningful, so
+            // hide the rail entirely and force any open inspector closed. A GraphicsClip's style is
+            // edited from the left Shapes/Text panels; its transform inspector is #15.
             RightRailColumn.Width = new GridLength(0);
             ViewModel.IsRightPanelOpen = false;
         }

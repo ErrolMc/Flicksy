@@ -18,7 +18,7 @@ Issues labeled [`needs-design`](https://github.com/ErrolMc/Flicksy/labels/needs-
 | [10](https://github.com/ErrolMc/Flicksy/issues/10) | Compositor design + scaffolding | needs-design | #4 |
 | [11](https://github.com/ErrolMc/Flicksy/issues/11) | Real playback — transport drives compositor | needs-design | #6, #10 |
 | [12](https://github.com/ErrolMc/Flicksy/issues/12) | Timeline editing — trim, split, move, delete | needs-design | #7, #10 |
-| [13](https://github.com/ErrolMc/Flicksy/issues/13) | GraphicsClip editing — drawing tools in Preview | needs-design | #6, #10 |
+| [13](https://github.com/ErrolMc/Flicksy/issues/13) | GraphicsClip editing — drawing tools in Preview | Ready ([ADR 0013](../adr/0013-graphicsclip-editing-one-object-per-clip.md)) | #6, #10 |
 | [14](https://github.com/ErrolMc/Flicksy/issues/14) | Transitions — model, UI, render | needs-design | #10, #12 |
 | [15](https://github.com/ErrolMc/Flicksy/issues/15) | Per-clip transform inspector | needs-design | #10 |
 | [16](https://github.com/ErrolMc/Flicksy/issues/16) | Per-clip filters / color correction | needs-design | #10 |

@@ -50,6 +50,11 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
     // every other frame paints into this same instance. CurrentFrame points at it.
     private WriteableBitmap? _target;
 
+    // The clip currently being edited on the graphics overlay, dropped from the preview composite
+    // so the overlay is the sole live renderer of that object (no stale double-draw) while its edit
+    // session is open. Preview-local — planner / compositor / export untouched (ADR 0013).
+    private Guid? _suppressedClipId;
+
     /// <summary>
     /// The most recently composited frame. <see cref="ImageSource"/> rather than
     /// <c>WriteableBitmap</c> so future backends could supply a different concrete type
@@ -268,10 +273,33 @@ public partial class PreviewViewModel : ObservableObject, IPlaybackFrameSink, ID
     private void TimedRenderFrame(int frame, WriteableBitmap target,
         IClipFrameProvider? frames = null, IReadOnlyList<CompositionLayer>? layers = null)
     {
+        if (_suppressedClipId is { } suppressedId)
+        {
+            // Drop the edited clip from this composite only. The static path passes no layer list,
+            // so plan here before filtering; playback/scrub already supply one.
+            IReadOnlyList<CompositionLayer> planned = layers ?? CompositionPlanner.PlanFrame(_project, frame);
+            layers = planned.Where(l => l.Clip.Id != suppressedId).ToList();
+        }
+
         _compositeTimer.Restart();
         _compositor.RenderFrame(_project, frame, target, frames, layers);
         _compositeTimer.Stop();
         PerformanceStats.RecordComposite(_compositeTimer.Elapsed.TotalMilliseconds);
+    }
+
+    /// <summary>
+    /// Drops a single clip (by id) from the PREVIEW composite while it's being edited on the
+    /// graphics overlay — the overlay is then its sole renderer, so there's no stale double-draw.
+    /// Preview-local: the planner, compositor, and export path are untouched (ADR 0013). Pass null
+    /// to clear. Repaints immediately so the change shows on a paused/static frame.
+    /// </summary>
+    public void SuppressClip(Guid? clipId)
+    {
+        if (_suppressedClipId == clipId)
+            return;
+
+        _suppressedClipId = clipId;
+        Render();
     }
 
     public void Dispose()

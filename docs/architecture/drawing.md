@@ -23,6 +23,7 @@ Flicksy.Drawing/
 └── ViewModels/
     DrawingViewModel
     SelectionOverlayViewModel
+    {Shape,Text,Fill,Outline}SettingsViewModel  ← tool-style state, shared by both editors
 ```
 
 Icon PNGs (rotate puck, shape options, toolbar buttons) live in **Flicksy.Icons** — see the [architecture index §6](../ARCHITECTURE.md).
@@ -31,12 +32,13 @@ Icon PNGs (rotate puck, shape options, toolbar buttons) live in **Flicksy.Icons*
 
 | ViewModel | Owns / Coordinates |
 | --- | --- |
-| [DrawingViewModel](../../Flicksy.Drawing/ViewModels/DrawingViewModel.cs) | `ObservableCollection<DrawingItem> Items` (z-ordered), `SelectedItem`, `EditingTextItem`, `History` (UndoManager). All gesture transitions (`BeginPenStroke`/`End...`, `BeginShape`/`End...`, `BeginText`/`BeginEditText`/`EndEditText`, `BeginTextStyleEdit`/`End...`, `BeginShapeStyleEdit`/`End...`, `BeginPenStyleEdit`/`End...`). Layer move + delete commands. |
+| [DrawingViewModel](../../Flicksy.Drawing/ViewModels/DrawingViewModel.cs) | `ObservableCollection<DrawingItem> Items` (z-ordered), `SelectedItem`, `EditingTextItem`, `History` (UndoManager). All gesture transitions (`BeginPenStroke`/`End...`, `BeginShape`/`End...`, `BeginText`/`BeginEditText`/`EndEditText`, `BeginTextStyleEdit`/`End...`, `BeginShapeStyleEdit`/`End...`, `BeginPenStyleEdit`/`End...`). Layer move + delete commands. **Two ctors**: parameterless (owns a fresh `Items` + `History`); `(ObservableCollection<DrawingItem>, UndoManager)` adopts an external collection + shared undo stack — the video editor's graphics overlay wraps a clip's item collection + the editor `History` for clip-level undo. |
 | [SelectionOverlayViewModel](../../Flicksy.Drawing/ViewModels/SelectionOverlayViewModel.cs) | `SelectedItem` + `IsActive` + `ShowHandles` + cached `CanonicalBounds`. Subscribes to the item's `Geometry`/`Transform.Changed` so the overlay redraws when the item moves. |
+| [Shape](../../Flicksy.Drawing/ViewModels/ShapeSettingsViewModel.cs) / [Text](../../Flicksy.Drawing/ViewModels/TextSettingsViewModel.cs) / [Fill](../../Flicksy.Drawing/ViewModels/FillSettingsViewModel.cs) / [Outline](../../Flicksy.Drawing/ViewModels/OutlineSettingsViewModel.cs) `SettingsViewModel` | Tool-style state shared by both editors' Shape/Text panels: shape-kind pick + `IsFillEnabled`, font/size, fill/outline swatch + opacity (`EffectiveBrush`). `SyncFromShapeItem`/`SyncFromTextItem`/`SyncFromBrush` drive the panel from a selected item so a restyle starts from its existing style. Views stay editor-specific (PostSnip popups vs. video-editor rail panels). |
 
 ## 3. Drawing model (Flicksy.Drawing/Source)
 
-All items inherit [DrawingItem](../../Flicksy.Drawing/Source/DrawingItem.cs) which provides `Geometry`, `MatrixTransform Transform`, abstract `CanonicalBounds`/`HitTest(localPoint)`/`Render(DrawingContext)`, and `Translate/Scale/RotateFrom(baseMatrix, ...)` helpers.
+All items inherit [DrawingItem](../../Flicksy.Drawing/Source/DrawingItem.cs) which provides `Geometry`, `MatrixTransform Transform`, abstract `CanonicalBounds`/`HitTest(localPoint)`/`Render(DrawingContext)`/`Clone()` (deep copy — used by the video editor's graphics-clip split), and `Translate/Scale/RotateFrom(baseMatrix, ...)` helpers.
 
 | Item | Geometry | Notes |
 | --- | --- | --- |
@@ -70,7 +72,7 @@ Crop is **not** an `IDrawingTool` — it edits image-level state rather than the
 
 ## 5. Undo (Flicksy.Drawing/Undo + Flicksy.PostSnip/Undo/Commands/CropCommand)
 
-[UndoManager](../../Flicksy.Drawing/Undo/UndoManager.cs): two stacks, capped at 100 entries. Exposes `UndoCommand`/`RedoCommand` RelayCommands. `Push` clears redo and trims oldest.
+[UndoManager](../../Flicksy.Drawing/Undo/UndoManager.cs): two stacks, capped at 100 entries. Exposes `UndoCommand`/`RedoCommand` RelayCommands. `Push` clears redo and trims oldest. `Begin`/`Commit(scope?)`/`Cancel` batch primitive: while a batch is open `Push` accumulates instead of recording, and `Commit` collapses the batch into one undo step (lone command pushed bare, else a `CompositeCommand`) — used for clip-level graphics placement (clip-add + item-add = one Ctrl+Z).
 
 Convention: commands are pushed **after** the change has already mutated state (gestures mutate live for visual feedback). `Redo()` is therefore only invoked when stepping forward through the redo stack, never on the initial push.
 

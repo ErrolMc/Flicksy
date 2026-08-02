@@ -116,6 +116,14 @@ public sealed class ShapeItem : DrawingItem
         OutlineThickness = Math.Max(0d, thickness);
     }
 
+    public override DrawingItem Clone()
+    {
+        var clone = new ShapeItem(Kind, P0, Fill, Outline, OutlineThickness);
+        clone.UpdateEndPoint(P1);
+        clone.Transform.Matrix = Transform.Matrix;
+        return clone;
+    }
+
     public bool IsDegenerate
     {
         get

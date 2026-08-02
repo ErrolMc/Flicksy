@@ -5,6 +5,5 @@ public enum LeftRailTab
     Media,
     Text,
     Shapes,
-    Pen,
     Transitions,
 }

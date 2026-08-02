@@ -7,11 +7,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Flicksy.Drawing.Helpers;
 
-namespace Flicksy.PostSnip.ViewModels;
+namespace Flicksy.Drawing.ViewModels;
 
-public partial class OutlineColorOption : ObservableObject
+public partial class FillColorOption : ObservableObject
 {
-    public OutlineColorOption(Brush brush, bool isNone = false)
+    public FillColorOption(Brush brush, bool isNone = false)
     {
         Brush = brush;
         IsNone = isNone;
@@ -25,22 +25,15 @@ public partial class OutlineColorOption : ObservableObject
     private bool isSelected;
 }
 
-public partial class OutlineSettingsViewModel : ObservableObject
+public partial class FillSettingsViewModel : ObservableObject
 {
-    public double MinSize { get; } = 1;
-
-    public double MaxSize { get; } = 30;
-
-    [ObservableProperty]
-    private double size = 4;
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveBrush))]
     private double opacity = 1;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveBrush))]
-    private OutlineColorOption? selectedColor;
+    private FillColorOption? selectedColor;
 
     public Brush? EffectiveBrush
     {
@@ -64,18 +57,18 @@ public partial class OutlineSettingsViewModel : ObservableObject
         }
     }
 
-    public ObservableCollection<OutlineColorOption> Colors { get; }
+    public ObservableCollection<FillColorOption> Colors { get; }
 
     public ImageSource CrossCircle { get; } = Images.cross_circle.ToImageSource();
 
-    public OutlineSettingsViewModel()
+    public FillSettingsViewModel()
     {
-        Colors = new ObservableCollection<OutlineColorOption>(CreateColors());
-        SelectColor(Colors[1]);
+        Colors = new ObservableCollection<FillColorOption>(CreateColors());
+        SelectColor(Colors[0]);
     }
 
     [RelayCommand]
-    private void SelectColor(OutlineColorOption option)
+    private void SelectColor(FillColorOption option)
     {
         if (SelectedColor is not null)
         {
@@ -87,14 +80,15 @@ public partial class OutlineSettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Drive the selected swatch + opacity from an existing brush. Null is treated as
-    /// "none". Unmatched brushes leave the VM unchanged.
+    /// Drive the selected swatch + opacity from an existing brush (e.g. the fill of a
+    /// text item just selected by the user). Null is treated as "none". Unmatched brushes
+    /// leave the VM unchanged.
     /// </summary>
     public void SyncFromBrush(Brush? brush)
     {
         if (brush is null)
         {
-            OutlineColorOption? noneOption = Colors.FirstOrDefault(o => o.IsNone);
+            FillColorOption? noneOption = Colors.FirstOrDefault(o => o.IsNone);
             if (noneOption is not null && !ReferenceEquals(SelectedColor, noneOption))
             {
                 SelectColor(noneOption);
@@ -108,7 +102,7 @@ public partial class OutlineSettingsViewModel : ObservableObject
         }
 
         Color target = solid.Color;
-        foreach (OutlineColorOption option in Colors)
+        foreach (FillColorOption option in Colors)
         {
             if (option.IsNone || option.Brush is not SolidColorBrush swatch)
             {
@@ -129,9 +123,9 @@ public partial class OutlineSettingsViewModel : ObservableObject
         }
     }
 
-    private static IEnumerable<OutlineColorOption> CreateColors()
+    private static IEnumerable<FillColorOption> CreateColors()
     {
-        yield return new OutlineColorOption(CreateBrush("#FFFFFF"), isNone: true);
+        yield return new FillColorOption(CreateBrush("#FFFFFF"), isNone: true);
 
         string[] hexes =
         {
@@ -144,7 +138,7 @@ public partial class OutlineSettingsViewModel : ObservableObject
 
         foreach (string hex in hexes)
         {
-            yield return new OutlineColorOption(CreateBrush(hex));
+            yield return new FillColorOption(CreateBrush(hex));
         }
     }
 

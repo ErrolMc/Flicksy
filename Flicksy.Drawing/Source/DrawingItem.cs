@@ -53,4 +53,10 @@ public abstract class DrawingItem : ObservableObject
     /// Renders the item into the given DrawingContext (used for flattening on save).
     /// </summary>
     public abstract void Render(DrawingContext dc);
+
+    /// <summary>
+    /// Returns a deep copy with independent geometry, transform, and style, so a caller
+    /// (e.g. a graphics-clip split) can place the clone without aliasing the original.
+    /// </summary>
+    public abstract DrawingItem Clone();
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows;
@@ -51,11 +52,25 @@ public partial class DrawingViewModel : ObservableObject
 
     public DrawingViewModel()
     {
-        Items.CollectionChanged += OnItemsChanged;
+        Items = new ObservableCollection<DrawingItem>();
         History = new UndoManager();
+        Items.CollectionChanged += OnItemsChanged;
     }
 
-    public ObservableCollection<DrawingItem> Items { get; } = new();
+    /// <summary>
+    /// Overlay ctor: adopts an existing item collection and undo stack instead of owning new
+    /// ones. The video editor's graphics overlay wraps the edited clip's item collection plus
+    /// the editor's shared <see cref="UndoManager"/>, so gestures mutate the clip's real items
+    /// and record onto the one history (clip-level undo).
+    /// </summary>
+    public DrawingViewModel(ObservableCollection<DrawingItem> items, UndoManager history)
+    {
+        Items = items ?? throw new ArgumentNullException(nameof(items));
+        History = history ?? throw new ArgumentNullException(nameof(history));
+        Items.CollectionChanged += OnItemsChanged;
+    }
+
+    public ObservableCollection<DrawingItem> Items { get; }
 
     public UndoManager History { get; }
 

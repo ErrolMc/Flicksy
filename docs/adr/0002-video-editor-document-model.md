@@ -6,7 +6,7 @@ The video editor's document is a `Project` containing `ProjectSettings` and an o
 
 Three concrete clip types:
 - **`MediaClip`** — references a video/audio source file with in/out source points, plus per-clip transform, filter chain, volume, and speed.
-- **`GraphicsClip`** — a time-bounded container of `DrawingItem`s (shared with the snip editor) plus a transform.
+- **`GraphicsClip`** — a time-bounded clip wrapping a single `DrawingItem` (shared with the snip editor) plus a transform; one graphic object per clip. (Originally a *container of `DrawingItem`s* — revised to one-object-per-clip by [ADR 0013](0013-graphicsclip-editing-one-object-per-clip.md).)
 - **`Transition`** — *not* a clip. A relationship between two adjacent `MediaClip`s on the same track, stored on the track in a separate list keyed by clip pair.
 
 All timeline positions and durations are **integer frame counts** at the project's framerate. Sub-frame audio is expressed in sample offsets, not fractional frames.

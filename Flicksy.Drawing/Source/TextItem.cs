@@ -139,6 +139,14 @@ public sealed class TextItem : DrawingItem
         OutlineThickness = Math.Max(0d, thickness);
     }
 
+    public override DrawingItem Clone()
+    {
+        // IsEditing is transient edit-session state and is intentionally not carried over.
+        var clone = new TextItem(Origin, FontFamily, FontSize, Fill, Outline, OutlineThickness, Text);
+        clone.Transform.Matrix = Transform.Matrix;
+        return clone;
+    }
+
     public override Rect CanonicalBounds
     {
         get

@@ -48,6 +48,16 @@ public sealed class PenStrokeItem : DrawingItem
         Thickness = Math.Max(0d, thickness);
     }
 
+    public override DrawingItem Clone()
+    {
+        var clone = new PenStrokeItem(Brush, Thickness);
+        var copiedPoints = new PointCollection(BasePoints);
+        clone.BasePoints = copiedPoints;
+        clone.Geometry = BuildGeometry(copiedPoints);
+        clone.Transform.Matrix = Transform.Matrix;
+        return clone;
+    }
+
     public override Rect CanonicalBounds
     {
         get

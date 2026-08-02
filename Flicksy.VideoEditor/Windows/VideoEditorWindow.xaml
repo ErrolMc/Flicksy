@@ -92,7 +92,6 @@
                                          Visibility="{Binding CurrentLeftTab, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:LeftRailTab.Media}}" />
                 <panels:TextPanel        Visibility="{Binding CurrentLeftTab, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:LeftRailTab.Text}}" />
                 <panels:ShapesPanel      Visibility="{Binding CurrentLeftTab, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:LeftRailTab.Shapes}}" />
-                <panels:PenPanel         Visibility="{Binding CurrentLeftTab, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:LeftRailTab.Pen}}" />
                 <panels:TransitionsPanel Visibility="{Binding CurrentLeftTab, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:LeftRailTab.Transitions}}" />
             </Grid>
 

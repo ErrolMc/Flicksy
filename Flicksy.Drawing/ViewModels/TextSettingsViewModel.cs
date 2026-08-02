@@ -7,7 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Flicksy.Drawing.Helpers;
 using Flicksy.Drawing.Source;
 
-namespace Flicksy.PostSnip.ViewModels;
+namespace Flicksy.Drawing.ViewModels;
 
 public partial class TextSettingsViewModel : ObservableObject
 {

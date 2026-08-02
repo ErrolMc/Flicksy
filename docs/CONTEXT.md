@@ -66,8 +66,8 @@ A first-class entity in `Project.MediaSources` representing an imported video/au
 _Avoid_: "asset", "media item", "import", "bin entry" (the bin is just the UI for the list).
 
 **GraphicsClip**:
-A `Clip` that holds a list of `DrawingItem`s (the existing pen/shape/text items) visible only between `TimelineStart` and `TimelineStart+Duration`. Has a `Transform` like `MediaClip`. The Snip editor's drawings live in a flat list of `DrawingItem`s; the Video editor's drawings live inside a `GraphicsClip`.
-_Avoid_: "overlay clip" (overlay is a *track kind*, not a clip kind), "text clip" (it's more general).
+A `Clip` wrapping a single `DrawingItem` (one shape or text element), visible only between `TimelineStart` and `TimelineStart+Duration`. Has a `Transform` like `MediaClip`. Each graphic object on the timeline is its own `GraphicsClip` (the Clipchamp / Final Cut model — *not* Premiere's one-clip-many-layers), so two objects visible at the same instant occupy separate Overlay tracks; the editor auto-stacks Overlay tracks as objects are added. Contrast the Snip editor, whose drawings live together in a flat, untimed list of `DrawingItem`s.
+_Avoid_: "overlay clip" (overlay is a *track kind*, not a clip kind), "text clip" (a `GraphicsClip` can wrap a shape too).
 
 **Transition**:
 A blended boundary between two adjacent `MediaClip`s on the same track. Properties: `LeftClip`, `RightClip`, `Type` (crossfade, fade-to-black, wipe, ...), `Duration`. **Not a `Clip`** — it is a relationship between two clips, stored on the track in a separate list.
@@ -138,11 +138,11 @@ _Avoid_: "render-ahead" (only decode is off-thread, not compositing), "proxy" (t
 **DrawingItem**:
 A visual primitive (`PenStrokeItem`, `ShapeItem`, `TextItem`) with `Geometry`, a `MatrixTransform`, hit-testing, and a `Render(DrawingContext)` method. Used by both surfaces:
 - In the snip editor: lives directly in `DrawingViewModel.Items`, always visible.
-- In the video editor: lives inside a `GraphicsClip`, visible only during the clip's time window.
+- In the video editor: wrapped one-to-one by a `GraphicsClip`, visible only during that clip's time window.
 _Avoid_: "shape" (collides with `ShapeItem`), "annotation", "overlay element".
 
 **Drawing tool**:
-A handler implementing `IDrawingTool` (`PenTool`, `ShapeTool`, `TextTool`, `SelectTool`, `EraseTool`) that converts pointer gestures into `DrawingItem` mutations. Used by both surfaces unchanged — the tools don't know whether the items they emit will end up in a flat list or a `GraphicsClip`.
+A handler implementing `IDrawingTool` (`PenTool`, `ShapeTool`, `TextTool`, `SelectTool`, `EraseTool`) that converts pointer gestures into `DrawingItem` mutations — destination-agnostic (it doesn't know whether the item lands in the snip editor's flat list or, in the video editor, inside a one-object `GraphicsClip`). The snip editor arms all five; the video editor arms only `SelectTool` / `ShapeTool` / `TextTool` (`PenTool` freehand and `EraseTool` are snip-only — one-object-per-`GraphicsClip` makes per-stroke clips impractical).
 _Avoid_: "brush" (means stroke color/fill in WPF).
 
 ## Flagged ambiguities

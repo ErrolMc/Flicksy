@@ -16,7 +16,7 @@ Flicksy.PostSnip/
 │   PostSnipViewModel
 │   ImageEditToolsViewModel
 │   CropOverlayViewModel
-│   {Pen,Shape,Text,Fill,Outline}SettingsViewModel
+│   PenSettingsViewModel   ← Shape/Text/Fill/Outline settings VMs now live in Flicksy.Drawing (shared)
 ├── Controls/
 │   ImageEditToolsView
 │   {Pen,Shape,Text,Fill,Outline}SettingsView
@@ -35,7 +35,7 @@ The canvas, drawing items, tools, undo stack, and FFmpeg playback live in the sh
 | [PostSnipViewModel](../../Flicksy.PostSnip/ViewModels/PostSnipViewModel.cs) | Root VM. Holds `Player`, `ImageEditTools`, `Drawing`, `SelectionOverlay`. Loads image/video, raises `SaveDialogRequested`/`CloseRequested`/`ErrorOccurred` for the window code-behind. Cross-VM wiring: subscribes to `Drawing.SelectedItem`/`EditingTextItem` + `ImageEditTools.SelectedTool`/`IsSelectActive` to keep selection overlay + text-edit lifecycle consistent. |
 | [ImageEditToolsViewModel](../../Flicksy.PostSnip/ViewModels/ImageEditToolsViewModel.cs) | `SelectedTool` enum (`ImageEditTool.Select/Pen/Erase/Shapes/Text/Crop`). Pen/Shape/Text sub-settings VMs. Popup open-state with 250ms debounce to stop reopen-on-close cycles. |
 | [CropOverlayViewModel](../../Flicksy.PostSnip/ViewModels/CropOverlayViewModel.cs) | Non-destructive crop state: `ImageWidth`/`Height`, `CommittedCrop` (persistent), `WorkingCrop` (mid-edit), `IsActive`. `EffectiveCrop`/`CurrentViewBounds` are what the view+window read. `BeginEdit`/`CommitEdit`/`CancelEdit` drive lifecycle; `CommitEdit` pushes a `CropCommand` if the rect changed. Holds a ref to `Drawing.History` for the push. |
-| [PenSettingsViewModel](../../Flicksy.PostSnip/ViewModels/PenSettingsViewModel.cs) / [ShapeSettingsViewModel](../../Flicksy.PostSnip/ViewModels/ShapeSettingsViewModel.cs) / [TextSettingsViewModel](../../Flicksy.PostSnip/ViewModels/TextSettingsViewModel.cs) | Tool-specific settings (size, color, font, etc). Shape+Text own a [FillSettingsViewModel](../../Flicksy.PostSnip/ViewModels/FillSettingsViewModel.cs) + [OutlineSettingsViewModel](../../Flicksy.PostSnip/ViewModels/OutlineSettingsViewModel.cs). Both fill/outline VMs expose `SyncFromBrush(...)`; Pen/Shape/Text expose `SyncFromPenStrokeItem`/`SyncFromShapeItem`/`SyncFromTextItem` to drive the whole popup from the selected item so a restyle starts from its existing style. |
+| [PenSettingsViewModel](../../Flicksy.PostSnip/ViewModels/PenSettingsViewModel.cs) (PostSnip-only) + the **shared** [Shape](../../Flicksy.Drawing/ViewModels/ShapeSettingsViewModel.cs) / [Text](../../Flicksy.Drawing/ViewModels/TextSettingsViewModel.cs) / [Fill](../../Flicksy.Drawing/ViewModels/FillSettingsViewModel.cs) / [Outline](../../Flicksy.Drawing/ViewModels/OutlineSettingsViewModel.cs) `SettingsViewModel`s (in `Flicksy.Drawing`, reused by the video editor — see [drawing.md](drawing.md) §2) | Tool-specific settings (size, color, font, etc). Shape+Text own a Fill + Outline VM. Both fill/outline VMs expose `SyncFromBrush(...)`; Pen/Shape/Text expose `SyncFromPenStrokeItem`/`SyncFromShapeItem`/`SyncFromTextItem` to drive the whole popup from the selected item so a restyle starts from its existing style. |
 
 ## 3. Controls
 

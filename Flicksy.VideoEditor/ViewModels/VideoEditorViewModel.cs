@@ -78,6 +78,10 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         // Share the one UndoManager with the timeline and the title bar's Edit menu so gesture
         // tools and menu Undo/Redo push to / read from the same stack.
         Timeline = new TimelineViewModel(project, Transport, history);
+        // Coordinates the graphics-editing overlay on the Preview (ADR 0013): tool arming, object
+        // placement → new GraphicsClip, per-clip Select-mode editing, and preview suppression. Shares
+        // the one UndoManager so placement / move / restyle land on the editor's undo stack.
+        GraphicsEditor = new GraphicsEditorViewModel(project, Timeline, Transport, Preview, history);
         Inspector = new InspectorViewModel();
         MediaBin = new MediaBinViewModel(project, overlayHost);
         // TitleBar opens overlays through the shared overlay host (as IOverlayService) and reads
@@ -128,6 +132,9 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
 
     public TimelineViewModel Timeline { get; }
 
+    /// <summary>Coordinates the Preview graphics-editing overlay (#13 / ADR 0013).</summary>
+    public GraphicsEditorViewModel GraphicsEditor { get; }
+
     public InspectorViewModel Inspector { get; }
 
     public MediaBinViewModel MediaBin { get; }
@@ -137,7 +144,6 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         new RailItem { Label = "Media", Glyph = "M", Tag = LeftRailTab.Media },
         new RailItem { Label = "Text", Glyph = "T", Tag = LeftRailTab.Text },
         new RailItem { Label = "Shapes", Glyph = "S", Tag = LeftRailTab.Shapes },
-        new RailItem { Label = "Pen", Glyph = "P", Tag = LeftRailTab.Pen },
         new RailItem { Label = "Transitions", Glyph = "Tr", Tag = LeftRailTab.Transitions },
     };
 
@@ -171,6 +177,15 @@ public partial class VideoEditorViewModel : ObservableObject, IDisposable
         {
             Timeline.SelectedClip = value;
         }
+
+        // Let the graphics overlay rebind to (or release) the selected clip — Select mode only.
+        GraphicsEditor?.OnSelectionChanged();
+    }
+
+    partial void OnCurrentLeftTabChanged(LeftRailTab value)
+    {
+        // Shapes/Text arm the overlay's placement tool; any other tab returns it to Select.
+        GraphicsEditor?.SetLeftTab(value);
     }
 
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)

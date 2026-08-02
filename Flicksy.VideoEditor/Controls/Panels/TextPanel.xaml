@@ -1,0 +1,68 @@
+<UserControl x:Class="Flicksy.VideoEditor.Controls.Panels.TextPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#181818">
+    <!-- DataContext stays the root VM (so the host's Visibility binding on CurrentLeftTab works);
+         the body binds to the shared TextSettings via the inner DataContext below. -->
+    <UserControl.Resources>
+        <DataTemplate x:Key="SwatchTemplate">
+            <Button Width="22" Height="22" Margin="2" Cursor="Hand"
+                    Command="{Binding DataContext.SelectColorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    CommandParameter="{Binding}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Sw" CornerRadius="3" BorderThickness="2"
+                                BorderBrush="#33FFFFFF" Background="{Binding Brush}" />
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsNone}" Value="True">
+                                <Setter TargetName="Sw" Property="Background" Value="#2B2B2B" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Sw" Property="BorderBrush" Value="#0078D4" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer DataContext="{Binding GraphicsEditor.TextSettings}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+            <TextBlock Text="Text" Foreground="#E0E0E0" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+
+            <!-- Arms text placement (GraphicsEditor.ArmTextCommand lives on the root VM, reached via the
+                 UserControl's inherited DataContext). Click, then click on the preview to drop a text box. -->
+            <Button Content="Add text box" Padding="10,6" Cursor="Hand" HorizontalAlignment="Left"
+                    Command="{Binding DataContext.GraphicsEditor.ArmTextCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+            <TextBlock Text="Font" Foreground="#B0B0B0" FontSize="12" Margin="0,14,0,4" />
+            <ComboBox ItemsSource="{Binding Fonts}" SelectedItem="{Binding SelectedFont}" />
+
+            <TextBlock Text="Size" Foreground="#B0B0B0" FontSize="12" Margin="0,14,0,4" />
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="120" VerticalAlignment="Center"
+                        Minimum="{Binding MinFontSize}" Maximum="{Binding MaxFontSize}"
+                        Value="{Binding FontSize}" />
+                <TextBlock Text="{Binding FontSize, StringFormat=0}" Foreground="#E0E0E0"
+                           Margin="8,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <TextBlock Text="Fill" Foreground="#B0B0B0" FontSize="12" Margin="0,14,0,4" />
+            <ItemsControl DataContext="{Binding FillSettings}" ItemsSource="{Binding Colors}"
+                          ItemTemplate="{StaticResource SwatchTemplate}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <TextBlock Text="Outline" Foreground="#B0B0B0" FontSize="12" Margin="0,14,0,4" />
+            <ItemsControl DataContext="{Binding OutlineSettings}" ItemsSource="{Binding Colors}"
+                          ItemTemplate="{StaticResource SwatchTemplate}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

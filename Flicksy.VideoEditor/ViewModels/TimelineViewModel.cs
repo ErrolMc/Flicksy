@@ -752,6 +752,22 @@ public partial class TimelineViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Inserts a new empty Overlay track at the TOP of the Overlay group (lowest overlay index →
+    /// painted last → on top, per <see cref="Composition.CompositionPlanner"/>'s z-order) and
+    /// returns it, pushing an <see cref="AddTrackCommand"/>. Graphics-object placement
+    /// (ADR 0013) uses this so a newly placed object stacks on top. Pushes onto <see cref="History"/>,
+    /// so a caller inside an <c>UndoManager</c> batch folds it into the placement's one undo step.
+    /// </summary>
+    public Track AddOverlayTrackOnTop()
+    {
+        var track = new Track { Kind = TrackKind.Overlay, Name = NextTrackName(TrackKind.Overlay) };
+        int index = FirstIndexOfKind(TrackKind.Overlay);
+        Project.Tracks.Insert(index, track);
+        History.Push(new AddTrackCommand(this, track, index));
+        return track;
+    }
+
+    /// <summary>
     /// Removes <paramref name="track"/> from the project as one undoable edit — the model entry for the
     /// track header's "Delete track" command (the View owns the confirm-if-non-empty prompt, so this
     /// stays headless-testable). Any selected clip living on the track is dropped from the selection
@@ -843,6 +859,19 @@ public partial class TimelineViewModel : ObservableObject
         for (int i = 0; i < Project.Tracks.Count; i++)
         {
             if ((int)Project.Tracks[i].Kind > (int)kind)
+                return i;
+        }
+        return Project.Tracks.Count;
+    }
+
+    // First index where a track of `kind` (or a later kind) sits — the TOP of `kind`'s group
+    // (contrast ResolveInsertIndex, which returns the BOTTOM). Inserting here stacks a new track
+    // above existing same-kind tracks (newest-on-top placement).
+    private int FirstIndexOfKind(TrackKind kind)
+    {
+        for (int i = 0; i < Project.Tracks.Count; i++)
+        {
+            if ((int)Project.Tracks[i].Kind >= (int)kind)
                 return i;
         }
         return Project.Tracks.Count;

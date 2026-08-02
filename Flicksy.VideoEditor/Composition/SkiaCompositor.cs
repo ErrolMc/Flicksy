@@ -222,10 +222,10 @@ public sealed class SkiaCompositor : ICompositor
 
     private void PaintGraphicsClip(SKCanvas canvas, GraphicsClip clip, int projectWidth, int projectHeight)
     {
-        if (clip.Items.Count == 0) 
+        if (clip.Item is null)
             return;
 
-        // GraphicsClip items render through WPF's DrawingContext. We bounce through a
+        // The graphics item renders through WPF's DrawingContext. We bounce through a
         // project-resolution RenderTargetBitmap, copy the pixels out, and hand them to
         // Skia. This is allocation-heavy (one full RTB + one byte[] per graphics layer
         // per frame); a future Skia-native render path would eliminate it. The bigger
@@ -235,10 +235,7 @@ public sealed class SkiaCompositor : ICompositor
         var visual = new DrawingVisual();
         using (DrawingContext dc = visual.RenderOpen())
         {
-            foreach (DrawingItem item in clip.Items)
-            {
-                item.Render(dc);
-            }
+            clip.Item.Render(dc);
         }
 
         var rtb = new RenderTargetBitmap(projectWidth, projectHeight, 96, 96, PixelFormats.Pbgra32);

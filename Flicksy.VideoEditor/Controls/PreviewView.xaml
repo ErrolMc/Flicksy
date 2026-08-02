@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Flicksy.VideoEditor.Controls"
+             xmlns:dctrls="clr-namespace:Flicksy.Drawing.Controls;assembly=Flicksy.Drawing"
              Background="#0A0A0A">
     <UserControl.Resources>
         <!-- Dark, compact ComboBox for the preview-quality selector (first ComboBox in the app).
@@ -105,16 +106,61 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid x:Name="PreviewRoot" SizeChanged="OnPreviewSizeChanged">
         <Image Source="{Binding CurrentFrame}"
                Stretch="Uniform"
                HorizontalAlignment="Stretch"
                VerticalAlignment="Stretch"
                SnapsToDevicePixels="True" />
 
+        <!-- Graphics-editing overlay (#13 / ADR 0013): a project-resolution DrawingView Uniform-fit
+             onto the Image's letterbox via OverlayScale/OverlayTranslate (computed in code-behind to
+             match Stretch=Uniform). DataContext is the coordinator's ActiveOverlay; arming + style DPs
+             come from GraphicsEditor on the root VM. Hit-test-transparent unless an edit session is open. -->
+        <Canvas x:Name="OverlayContent"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Width="{Binding ProjectSettings.ResolutionWidth}"
+                Height="{Binding ProjectSettings.ResolutionHeight}"
+                RenderTransformOrigin="0,0"
+                SizeChanged="OnPreviewSizeChanged">
+            <Canvas.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="OverlayScale" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="OverlayTranslate" X="0" Y="0" />
+                </TransformGroup>
+            </Canvas.RenderTransform>
+            <!-- Sized from the host Canvas (NOT a local ProjectSettings binding — this control's
+                 DataContext is the overlay VM, which has no ProjectSettings), mirroring how PostSnip
+                 sizes its DrawingView from EditedImage.ActualWidth. A zero size would make the canvas
+                 unhittable (TryGetPoint bails on ActualWidth <= 0). -->
+            <dctrls:DrawingView Width="{Binding ElementName=OverlayContent, Path=ActualWidth}"
+                                Height="{Binding ElementName=OverlayContent, Path=ActualHeight}"
+                                DataContext="{Binding DataContext.GraphicsEditor.ActiveOverlay, RelativeSource={RelativeSource AncestorType=Window}}"
+                                IsSelectActive="{Binding DataContext.GraphicsEditor.IsSelectActive, RelativeSource={RelativeSource AncestorType=Window}}"
+                                IsShapeActive="{Binding DataContext.GraphicsEditor.IsShapeActive, RelativeSource={RelativeSource AncestorType=Window}}"
+                                IsTextActive="{Binding DataContext.GraphicsEditor.IsTextActive, RelativeSource={RelativeSource AncestorType=Window}}"
+                                ActiveShape="{Binding DataContext.GraphicsEditor.ShapeSettings.SelectedShape.Kind, RelativeSource={RelativeSource AncestorType=Window}}"
+                                FillBrush="{Binding DataContext.GraphicsEditor.ShapeSettings.FillSettings.EffectiveBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                OutlineBrush="{Binding DataContext.GraphicsEditor.ShapeSettings.OutlineSettings.EffectiveBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                OutlineThickness="{Binding DataContext.GraphicsEditor.ShapeSettings.OutlineSettings.Size, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TextFontFamily="{Binding DataContext.GraphicsEditor.TextSettings.SelectedFont, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TextFontSize="{Binding DataContext.GraphicsEditor.TextSettings.FontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TextFillBrush="{Binding DataContext.GraphicsEditor.TextSettings.FillSettings.EffectiveBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TextOutlineBrush="{Binding DataContext.GraphicsEditor.TextSettings.OutlineSettings.EffectiveBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TextOutlineThickness="{Binding DataContext.GraphicsEditor.TextSettings.OutlineSettings.Size, RelativeSource={RelativeSource AncestorType=Window}}"
+                                ContentScale="{Binding ElementName=OverlayScale, Path=ScaleX}"
+                                IsHitTestVisible="{Binding DataContext.GraphicsEditor.IsOverlayActive, RelativeSource={RelativeSource AncestorType=Window}}" />
+        </Canvas>
+        <dctrls:SelectionOverlayView DataContext="{Binding DataContext.GraphicsEditor.SelectionOverlay, RelativeSource={RelativeSource AncestorType=Window}}"
+                                     ContentToViewport="{Binding ElementName=OverlayContent, Path=RenderTransform}"
+                                     IsHitTestVisible="{Binding DataContext.GraphicsEditor.IsOverlayActive, RelativeSource={RelativeSource AncestorType=Window}}"
+                                     Panel.ZIndex="5" />
+
         <!-- Performance stats HUD (top-left). Gated by VideoEditorSettings.ShowPerformanceStats via
              PreviewViewModel.PerformanceStats. -->
         <controls:PerformanceStatsView DataContext="{Binding PerformanceStats}"
+                                       Panel.ZIndex="10"
                                        HorizontalAlignment="Left"
                                        VerticalAlignment="Top"
                                        Margin="10,10,0,0" />
@@ -122,6 +168,7 @@
         <!-- Preview-quality selector. View-only proxy setting (ADR 0008) — never affects export. -->
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
+                Panel.ZIndex="10"
                 Margin="0,0,10,10"
                 Background="#99000000"
                 CornerRadius="4"

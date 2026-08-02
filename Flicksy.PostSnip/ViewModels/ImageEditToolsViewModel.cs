@@ -2,6 +2,7 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Flicksy.Drawing.Helpers;
+using Flicksy.Drawing.ViewModels;
 
 namespace Flicksy.PostSnip.ViewModels;
 
