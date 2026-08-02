@@ -13,8 +13,8 @@ namespace Flicksy.VideoEditor.Interaction.Tools;
 /// selection at the playhead. The cut delegates to <see cref="TimelineViewModel.SplitClipAt"/>, where
 /// all the source-time math and eligibility live, so this tool is a thin pointer adapter.
 /// <para>
-/// MediaClip-only in v1 (GraphicsClip cut is deferred with the rest of #13); a click on empty lane
-/// space or a non-MediaClip is consumed without effect so razor mode never falls through to
+/// Cuts both clip kinds (MediaClip source-split or GraphicsClip clone-split; #13). A click on empty
+/// lane space or an inert track is consumed without effect so razor mode never falls through to
 /// select / scrub. Resolves fully on pointer-down — no drag, so <see cref="IsActive"/> is always
 /// false and <see cref="Cancel"/> is a no-op. Hover shows a crosshair over a cuttable clip.
 /// </para>
@@ -34,9 +34,9 @@ public sealed class RazorTool : ITimelineTool
 
     public bool OnPointerDown(Point point, TimelineHit hit, MouseButtonEventArgs e)
     {
-        if (hit.Clip is MediaClip clip)
+        if (hit.Clip is MediaClip or GraphicsClip)
         {
-            _viewModel.SplitClipAt(clip, hit.Frame);
+            _viewModel.SplitClipAt(hit.Clip!, hit.Frame);
         }
 
         // Consume even a miss so razor mode never falls through to select / scrub.
@@ -56,7 +56,7 @@ public sealed class RazorTool : ITimelineTool
     public void OnPointerHover(Point point, TimelineHit hit, MouseEventArgs e)
     {
         // Crosshair over a cuttable clip; default arrow over empty lane space or an inert track.
-        _surface.Cursor = hit.Clip is MediaClip ? Cursors.Cross : null;
+        _surface.Cursor = hit.Clip is MediaClip or GraphicsClip ? Cursors.Cross : null;
     }
 
     public void Cancel()

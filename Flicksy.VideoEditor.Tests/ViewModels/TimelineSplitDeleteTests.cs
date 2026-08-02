@@ -186,22 +186,67 @@ public class TimelineSplitDeleteTests
     }
 
     [Test]
-    public void SplitSelectedAtPlayhead_SkipsNonMediaAndUncrossedClips()
+    public void SplitSelectedAtPlayhead_SplitsMediaAndGraphics_SkipsUncrossed()
     {
         var project = new ProjectModel();
         Track video = AddTrack(project);
         Track overlay = AddTrack(project, TrackKind.Overlay);
         MediaSource source = AddSource(project, durationSeconds: 20);
         MediaClip media = AddMediaClip(video, source, start: 0, sourceIn: 0, sourceOut: 5);   // [0, 150)
-        GraphicsClip graphics = AddGraphicsClip(overlay, start: 0, duration: 150);              // GraphicsClip — split deferred to #13
+        GraphicsClip graphics = AddGraphicsClip(overlay, start: 0, duration: 150);            // [0, 150) — crosses
+        GraphicsClip uncrossed = AddGraphicsClip(overlay, start: 200, duration: 50);          // [200, 250) — playhead misses
         TimelineViewModel vm = MakeViewModel(project);
         vm.Transport.Playhead = 60;
-        vm.SetSelection(new Clip[] { media, graphics });
+        vm.SetSelection(new Clip[] { media, graphics, uncrossed });
 
         vm.SplitSelectedAtPlayheadCommand.Execute(null);
 
-        Assert.That(video.Clips.Count, Is.EqualTo(2));     // MediaClip split
-        Assert.That(overlay.Clips.Count, Is.EqualTo(1));   // GraphicsClip untouched
+        Assert.That(video.Clips.Count, Is.EqualTo(2));     // MediaClip split (#13: graphics now splits too)
+        Assert.That(overlay.Clips.Count, Is.EqualTo(3));   // graphics split (→2) + uncrossed untouched (1)
+    }
+
+    // ---- Graphics split (#13) ----------------------------------------------
+
+    [Test]
+    public void SplitGraphicsClipAt_DividesDuration_AndUndoRedoRoundTrips()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        vm.SplitClipAt(clip, frame: 40);
+        Assert.That(overlay.Clips.Count, Is.EqualTo(2));
+        Assert.That(clip.DurationFrames, Is.EqualTo(30));                        // left [10, 40)
+        var right = (GraphicsClip)overlay.Clips[1];
+        Assert.That(right.TimelineStart, Is.EqualTo(40));
+        Assert.That(right.DurationFrames, Is.EqualTo(60));                       // right [40, 100)
+        Assert.That(right.Transform, Is.Not.SameAs(clip.Transform));            // independent transform
+
+        vm.History.UndoCommand.Execute(null);
+        Assert.That(overlay.Clips.Count, Is.EqualTo(1));
+        Assert.That(clip.DurationFrames, Is.EqualTo(90));                        // restored
+        Assert.That(vm.SelectedClip, Is.SameAs(clip));
+
+        vm.History.RedoCommand.Execute(null);
+        Assert.That(overlay.Clips.Count, Is.EqualTo(2));
+        Assert.That(clip.DurationFrames, Is.EqualTo(30));                        // re-split
+    }
+
+    [Test]
+    public void SplitGraphicsClipAt_PlayheadAtOrOutsideEdges_NoOp()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        vm.SplitClipAt(clip, frame: 10);    // exactly the start
+        vm.SplitClipAt(clip, frame: 100);   // exactly the end
+        vm.SplitClipAt(clip, frame: 5);     // before the clip
+
+        Assert.That(overlay.Clips.Count, Is.EqualTo(1));
+        Assert.That(vm.History.CanUndo, Is.False);
     }
 
     // ---- Transition reassignment on split (Track helper) -------------------

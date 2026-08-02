@@ -303,6 +303,103 @@ public class TimelineTrimTests
         Assert.That(clip.Duration, Is.EqualTo(120));
     }
 
+    // ---- Graphics trim (#13): pure time-window, no source range ------------
+
+    [Test]
+    public void ResolveGraphicsTrim_RightEdge_ExtendsDurationFreely_HoldsStart()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult r = vm.ResolveGraphicsTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 130);
+
+        Assert.That(r.TimelineStart, Is.EqualTo(10));        // start held
+        Assert.That(r.DurationFrames, Is.EqualTo(120));      // end → 130, no source cap (extends freely)
+    }
+
+    [Test]
+    public void ResolveGraphicsTrim_LeftEdge_SlidesStart_HoldsEnd()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult r = vm.ResolveGraphicsTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);
+
+        Assert.That(r.TimelineStart, Is.EqualTo(40));
+        Assert.That(r.DurationFrames, Is.EqualTo(60));       // end held at 100
+    }
+
+    [Test]
+    public void ResolveGraphicsTrim_RightEdge_FloorsAtOneFrame()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult r = vm.ResolveGraphicsTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 3);
+        ApplyGraphics(clip, r);
+
+        Assert.That(clip.TimelineStart, Is.EqualTo(10));
+        Assert.That(clip.Duration, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ResolveGraphicsTrim_LeftEdge_FloorsAtFrameZero()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 20, duration: 60);   // [20, 80)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult r = vm.ResolveGraphicsTrim(clip, fromLeftEdge: true, desiredEdgeFrame: -50);
+
+        Assert.That(r.TimelineStart, Is.EqualTo(0));         // no source floor — frame 0 binds
+        Assert.That(r.DurationFrames, Is.EqualTo(80));       // end held at 80
+    }
+
+    [Test]
+    public void ResolveGraphicsTrim_RightEdge_ClampsToNextNeighbour()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        AddGraphicsClip(overlay, start: 150, duration: 50);                      // right neighbour [150, 200)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult r = vm.ResolveGraphicsTrim(clip, fromLeftEdge: false, desiredEdgeFrame: 300);
+        ApplyGraphics(clip, r);
+
+        Assert.That(clip.TimelineStart + clip.Duration, Is.EqualTo(150));        // pinned at the neighbour edge
+    }
+
+    [Test]
+    public void GraphicsTrimClipCommand_UndoRedo_RestoresStateAndSelectsClip()
+    {
+        var project = new ProjectModel();
+        Track overlay = AddTrack(project, TrackKind.Overlay);
+        GraphicsClip clip = AddGraphicsClip(overlay, start: 10, duration: 90);   // [10, 100)
+        TimelineViewModel vm = MakeViewModel(project);
+
+        GraphicsTrimResult before = GraphicsTrimResult.Capture(clip);
+        GraphicsTrimResult after = vm.ResolveGraphicsTrim(clip, fromLeftEdge: true, desiredEdgeFrame: 40);
+        ApplyGraphics(clip, after);
+        vm.History.Push(new GraphicsTrimClipCommand(vm, clip, before, after));
+
+        vm.History.UndoCommand.Execute(null);
+        Assert.That(clip.TimelineStart, Is.EqualTo(10));
+        Assert.That(clip.DurationFrames, Is.EqualTo(90));
+        Assert.That(vm.SelectedClip, Is.SameAs(clip));
+
+        vm.History.RedoCommand.Execute(null);
+        Assert.That(clip.TimelineStart, Is.EqualTo(40));
+        Assert.That(clip.DurationFrames, Is.EqualTo(60));
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private static TimelineViewModel MakeViewModel(ProjectModel project) =>
@@ -352,5 +449,18 @@ public class TimelineTrimTests
         clip.SourceIn = r.SourceIn;
         clip.SourceOut = r.SourceOut;
         clip.TimelineStart = r.TimelineStart;
+    }
+
+    private static GraphicsClip AddGraphicsClip(Track track, int start, int duration)
+    {
+        var clip = new GraphicsClip { TimelineStart = start, DurationFrames = duration };
+        track.Clips.Add(clip);
+        return clip;
+    }
+
+    private static void ApplyGraphics(GraphicsClip clip, GraphicsTrimResult r)
+    {
+        clip.TimelineStart = r.TimelineStart;
+        clip.DurationFrames = r.DurationFrames;
     }
 }

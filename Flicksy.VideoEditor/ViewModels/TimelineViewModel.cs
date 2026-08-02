@@ -602,6 +602,39 @@ public partial class TimelineViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Resolves a single-edge trim of a <see cref="GraphicsClip"/> — the graphics sibling of
+    /// <see cref="ResolveTrim"/>. A graphics clip has no source range, so this is a pure time-window
+    /// edit: the dragged edge clamps to the neighbour clip / frame 0 / a 1-frame minimum (no source
+    /// bound, so it can extend freely the other way). Left edge slides <see cref="Clip.TimelineStart"/>
+    /// and shrinks/grows <see cref="GraphicsClip.DurationFrames"/>; right edge moves only the duration.
+    /// </summary>
+    public GraphicsTrimResult ResolveGraphicsTrim(GraphicsClip clip, bool fromLeftEdge, int desiredEdgeFrame)
+    {
+        int start = clip.TimelineStart;
+        int duration = clip.Duration;
+        if (duration < 1)
+            return GraphicsTrimResult.Capture(clip);
+
+        int end = start + duration;
+        Track? track = FindTrack(clip);
+
+        if (fromLeftEdge)
+        {
+            int upper = end - 1;                                   // 1-frame minimum
+            int lower = Math.Max(0, PrevClipEnd(track, clip, start));
+            int newStart = Math.Clamp(desiredEdgeFrame, lower, upper);
+            return new GraphicsTrimResult(newStart, end - newStart);
+        }
+        else
+        {
+            int lower = start + 1;                                 // 1-frame minimum
+            int upper = NextClipStart(track, clip, end);           // neighbour, or no timeline cap
+            int newEnd = Math.Clamp(desiredEdgeFrame, lower, upper);
+            return new GraphicsTrimResult(start, newEnd - start);
+        }
+    }
+
     // Greatest end frame among clips entirely left of `start` on the track (clips never overlap, so
     // every other clip is wholly left or wholly right). Frame 0 when there's no left neighbour — the
     // left edge can't be trimmed before the track origin regardless.
@@ -909,10 +942,10 @@ public partial class TimelineViewModel : ObservableObject
     /// (<c>RazorTool</c> calls this). No-op unless the frame is strictly inside the clip on an
     /// unlocked track. Pushes a single <c>SplitClipCommand</c> and selects the left half (the original).
     /// </summary>
-    public void SplitClipAt(MediaClip clip, int frame)
+    public void SplitClipAt(Clip clip, int frame)
     {
-        var command = CreateSplit(clip, frame);
-        if (command is null) 
+        IUndoableCommand? command = CreateSplitCommand(clip, frame);
+        if (command is null)
             return;
 
         History.Push(command);
@@ -926,17 +959,17 @@ public partial class TimelineViewModel : ObservableObject
     /// The originally-selected clips stay selected (each as its left half). Bundles multiple splits
     /// in a <c>CompositeCommand</c>; a no-op when nothing splits.
     /// </summary>
-    private bool CanSplitSelected() => SelectedClips.Any(c => c is MediaClip);
+    private bool CanSplitSelected() => SelectedClips.Any(c => c is MediaClip or GraphicsClip);
 
     [RelayCommand(CanExecute = nameof(CanSplitSelected))]
     private void SplitSelectedAtPlayhead()
     {
         int frame = Transport.Playhead;
         var commands = new List<IUndoableCommand>();
-        foreach (MediaClip clip in SelectedClips.OfType<MediaClip>().ToList())
+        foreach (Clip clip in SelectedClips.ToList())
         {
-            SplitClipCommand? command = CreateSplit(clip, frame);
-            if (command is not null) 
+            IUndoableCommand? command = CreateSplitCommand(clip, frame);
+            if (command is not null)
                 commands.Add(command);
         }
         PushBundle(commands);
@@ -974,6 +1007,15 @@ public partial class TimelineViewModel : ObservableObject
         SetSelection(Array.Empty<Clip>());
         PushBundle(commands);
     }
+
+    // Dispatches a split to the right per-clip-type creator (each performs the mutation live and
+    // returns the recorded command, or null when the clip can't split at `frame`).
+    private IUndoableCommand? CreateSplitCommand(Clip clip, int frame) => clip switch
+    {
+        MediaClip media => CreateSplit(media, frame),
+        GraphicsClip graphics => CreateGraphicsSplit(graphics, frame),
+        _ => null,
+    };
 
     // Performs the split mutation for one clip and returns the (already-applied) command, or null
     // when the clip can't split here. The original is kept as the left half, so right-edge transitions
@@ -1020,6 +1062,36 @@ public partial class TimelineViewModel : ObservableObject
         List<Transition> transitionsAfter = track.Transitions.ToList();
 
         return new SplitClipCommand(this, track, clip, right, sourceOutBefore, splitSourceTime, transitionsBefore, transitionsAfter);
+    }
+
+    // Graphics sibling of CreateSplit: keeps the original as the left half (DurationFrames pulled back
+    // to the cut) and adds a right half wrapping a clone of the same drawing object. No source mapping,
+    // no transitions (overlay graphics never carry them).
+    private GraphicsSplitClipCommand? CreateGraphicsSplit(GraphicsClip clip, int frame)
+    {
+        Track? track = FindTrack(clip);
+        if (track is null || track.Locked)
+            return null;
+
+        int start = clip.TimelineStart;
+        int duration = clip.Duration;
+        if (frame <= start || frame >= start + duration)
+            return null;   // strictly inside → both halves >= 1 frame
+
+        int leftDurationBefore = clip.DurationFrames;
+
+        var right = new GraphicsClip
+        {
+            TimelineStart = frame,
+            DurationFrames = start + duration - frame,
+            Item = clip.Item?.Clone(),
+        };
+        right.Transform.CopyFrom(clip.Transform);
+
+        clip.DurationFrames = frame - start;   // shrink the original into the left half
+        InsertSorted(track, right);
+
+        return new GraphicsSplitClipCommand(this, track, clip, right, leftDurationBefore, frame);
     }
 
     // Pushes a single command directly, or bundles several into one CompositeCommand undo step with a
